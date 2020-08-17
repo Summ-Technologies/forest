@@ -7,3 +7,4 @@ __pycache__
 .project
 .settings
 .DS_Store
+app.log

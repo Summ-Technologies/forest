@@ -1,0 +1,8 @@
+redwood-db<=0.1.0
+summn-web<=0.1.0
+summn-logging<=0.1.0
+Flask
+Flask-RESTful
+Flask-SQLAlchemy
+Flask-Cors==3.0.8
+webargs
