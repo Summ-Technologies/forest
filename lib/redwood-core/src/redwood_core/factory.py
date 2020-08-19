@@ -38,3 +38,6 @@ class ManagerFactory(object):
                 manager = manager_class(self.session, self.config)
                 self.manager_cache[manager_name] = manager
         return manager
+
+    def commit_changes(self):
+        self.session.commit()

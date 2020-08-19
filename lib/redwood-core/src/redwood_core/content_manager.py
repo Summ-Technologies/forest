@@ -16,10 +16,10 @@ class ContentManager(ManagerFactory):
 
     def get_articles_by_box_id(self, user: User, box_id: int):
         user_articles = self.session.query(Article.id).filter_by(user_id=user.id)
-        return (
-            self.session.query(Triage)
+        article_ids = (
+            self.session.query(Triage.article_id)
             .filter(Triage.article_id.in_(user_articles))
             .filter_by(box_id=box_id)
             .filter_by(is_active=True)
-            .all()
         )
+        return self.session.query(Article).filter(Article.id.in_(article_ids)).all()

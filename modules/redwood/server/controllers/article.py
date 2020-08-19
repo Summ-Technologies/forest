@@ -1,5 +1,6 @@
 import logging
 
+from flask import g
 from flask_restful import Resource
 
 from redwood_core.content_manager import ContentManager
@@ -23,5 +24,11 @@ class ArticleController(Resource):
 
 class BoxArticlesListController(Resource):
     @jwt.requires_auth
-    def get(self, box_id: int):
-        articles = content_manager.get_articles_by_box_id(user, box_id)
+    def get(self, id: int):
+        """
+        Get articles for box with id.
+        """
+        articles = content_manager.get_articles_by_box_id(g.user, id)
+        return responses.success(
+            {"articles": list(map(lambda article: article.to_json(), articles))}
+        )
