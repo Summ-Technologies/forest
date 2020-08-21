@@ -15,3 +15,4 @@ def add_routes(api: Api):
         article.BoxArticlesListController, route_v1("/user/boxes/<int:id>/articles")
     )
     api.add_resource(article.ArticleController, route_v1("/user/articles/<int:id>"))
+    api.add_resource(triage.TriageController, route_v1("/user/triages"))

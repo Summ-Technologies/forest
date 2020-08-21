@@ -2,6 +2,8 @@ import logging
 
 from flask import g
 from flask_restful import Resource
+from webargs import fields
+from webargs.flaskparser import use_args
 
 from redwood_core.content_manager import ContentManager
 from redwood_core.triage_manager import TriageManager
@@ -22,3 +24,22 @@ class BoxListController(Resource):
         """
         boxes = triage_manager.get_boxes_for_user(g.user)
         return responses.success({"boxes": list(map(lambda box: box.to_json(), boxes))})
+
+
+class TriageController(Resource):
+    post_args = {
+        "article_id": fields.Integer(data_key="articleId", required=True),
+        "box_id": fields.Integer(data_key="boxId", required=True),
+    }
+
+    @jwt.requires_auth
+    @use_args(post_args, location="json")
+    def post(self, args):
+        """
+        Move an article into a new box.
+        """
+        new_triage = triage_manager.triage_article(
+            g.user, args.get("article_id"), args.get("box_id")
+        )
+        triage_manager.commit_changes()
+        return responses.success(None)
