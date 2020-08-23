@@ -64,7 +64,7 @@ class TriageManager(ManagerFactory):
         if (article) and (box and box.user_id == user.id):
             # ensure the article doesn't already exist in the correct box
             current_box = self.get_box_for_article_id(user, article.id)
-            if current_box and current_box.id != box.id:
+            if not current_box or current_box.id != box.id:
                 # mark previous triages as inactive
                 triage = self.create_new_triage(article, box)
             else:

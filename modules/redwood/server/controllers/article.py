@@ -29,6 +29,4 @@ class BoxArticlesListController(Resource):
         Get articles for box with id.
         """
         articles = content_manager.get_articles_by_box_id(g.user, id)
-        return responses.success(
-            {"articles": list(map(lambda article: article.to_json(), articles))}
-        )
+        return responses.success(list(map(lambda article: article.to_json(), articles)))

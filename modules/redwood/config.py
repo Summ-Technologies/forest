@@ -1,5 +1,8 @@
 import os
 
+# CORS through summn-web
+CORS_ALLOW_ORIGINS = os.environ.get("CORS_ALLOW_ORIGINS", "").split(",")
+
 # SQLALCHEMY
 SQLALCHEMY_DATABASE_URI = os.environ.get("SQLALCHEMY_DATABASE_URI")
 
