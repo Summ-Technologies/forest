@@ -16,3 +16,5 @@ def add_routes(api: Api):
     )
     api.add_resource(article.ArticleController, route_v1("/user/articles/<int:id>"))
     api.add_resource(triage.TriageController, route_v1("/user/triages"))
+
+    api.add_resource(article.NewArticleController, route_v1("/user/admin/articles"))
