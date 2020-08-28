@@ -35,5 +35,6 @@ class ContentManager(ManagerFactory):
             .filter(Triage.article_id.in_(user_articles))
             .filter_by(box_id=box_id)
             .filter_by(is_active=True)
+            .order_by(Triage.created_at.asc())
         )
         return self.session.query(Article).filter(Article.id.in_(article_ids)).all()
