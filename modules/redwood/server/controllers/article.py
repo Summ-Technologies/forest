@@ -71,3 +71,23 @@ class BoxArticlesListController(Resource):
         """
         articles = content_manager.get_articles_by_box_id(g.user, id)
         return responses.success(list(map(lambda article: article.to_json(), articles)))
+
+
+class BookmarkController(Resource):
+    @jwt.requires_auth
+    def post(self, id):
+        article = content_manager.get_article_by_id(id, g.user)
+        if article:
+            content_manager.bookmark_article(article)
+            content_manager.commit_changes()
+            return responses.success(article.to_json())
+        return responses.error("Article not found", 404)
+
+    @jwt.requires_auth
+    def delete(self, id):
+        article = content_manager.get_article_by_id(id, g.user)
+        if article:
+            content_manager.unbookmark_article(article)
+            content_manager.commit_changes()
+            return responses.success(article.to_json())
+        return responses.error("Article not found", 404)

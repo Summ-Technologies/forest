@@ -41,3 +41,19 @@ class ContentManager(ManagerFactory):
             self.session.query(Article).get(article_id)
             for article_id in article_ids.all()
         ]
+
+    def bookmark_article(self, article: Article) -> Article:
+        """Add bookmarked to article"""
+        if not article.bookmarked:
+            article.bookmarked = True
+            self.session.add(article)
+            self.session.flush()
+        return article
+
+    def unbookmark_article(self, article: Article) -> Article:
+        """Remove bookmark from article"""
+        if article.bookmarked:
+            article.bookmarked = False
+            self.session.add(article)
+            self.session.flush()
+        return article
