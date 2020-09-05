@@ -16,7 +16,7 @@ class GoogleApiClient:
     def __init__(self, credentials: google.oauth2.credentials.Credentials):
         self.credentials = credentials
 
-    def _gmail_service(self) -> Resource:
+    def get_gmail_service(self) -> Resource:
         if self.gmail_service == None:
             if self.credentials == None:
                 logger.error("GmailClient object was not initialized with credentials.")
@@ -38,7 +38,7 @@ class GoogleApiClient:
                 "historyId": <str>
             }
         """
-        gmail_service = self._gmail_service()
+        gmail_service = self.get_gmail_service()
         profile = gmail_service.users().getProfile(userId="me").execute()
         return profile
 

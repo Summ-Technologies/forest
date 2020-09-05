@@ -1,0 +1,4 @@
+summn-logging<=0.1.0
+redwood-core<=0.1.0
+autotroph-core<=0.1.0
+redwood-rabbitmq<=0.1.0

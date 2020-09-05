@@ -20,4 +20,6 @@ class UserGoogleAccountController(Resource):
             ret = {"email": email}
             return responses.success(ret)
         else:
-            return responses.error("Google account not credentials have expired.")
+            return responses.error(
+                "Google account credentials do not exist or have expired."
+            )

@@ -16,8 +16,6 @@ logger = logging.getLogger(__name__)
 class UserManager(ManagerFactory):
     PW_SALT = bcrypt.gensalt(rounds=12)
 
-    google_api_clients: Dict[str, GoogleApiClient] = {}
-
     def get_google_account_email(self, user: User) -> Optional[str]:
         """Return email associated with the google account connected to the given user"""
         google_api_client = self._get_google_api_client(user)
