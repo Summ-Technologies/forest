@@ -1,8 +1,9 @@
 import logging
-from typing import Optional
+from typing import Dict, Optional
 
 import bcrypt
 
+from autotroph_core.google_api import GoogleApiClient
 from autotroph_core.google_auth import GoogleAuthClient
 from redwood_db.auth import GoogleAuthCredential, GoogleAuthState
 from redwood_db.user import User
@@ -14,6 +15,14 @@ logger = logging.getLogger(__name__)
 
 class UserManager(ManagerFactory):
     PW_SALT = bcrypt.gensalt(rounds=12)
+
+    google_api_clients: Dict[str, GoogleApiClient] = {}
+
+    def get_google_account_email(self, user: User) -> Optional[str]:
+        """Return email associated with the google account connected to the given user"""
+        google_api_client = self._get_google_api_client(user)
+        if google_api_client:
+            return google_api_client.get_user_profile().get("emailAddress")
 
     def google_oauth_step1(self, user: User) -> str:
         """Step 1 when linking Redwood account with google account.
@@ -74,6 +83,24 @@ class UserManager(ManagerFactory):
         user = self.session.query(User).filter_by(email=email.lower()).one_or_none()
         if user is not None and self._check_pw(password, user.password_hash):
             return user
+
+    def _get_google_api_client(self, user: User) -> Optional[GoogleApiClient]:
+        """Create GoogleApiClient object for given user if they have connected their google account"""
+        credentials_record: GoogleAuthCredential = self.session.query(
+            GoogleAuthCredential
+        ).filter_by(user_id=user.id).order_by(
+            GoogleAuthCredential.created_at.desc()
+        ).filter(
+            GoogleAuthCredential.created_at != None
+        ).first()
+        if credentials_record:
+            credentials_json_str = credentials_record.credentials
+            return GoogleApiClient.init_api_client(credentials_json_str)
+        else:
+            logger.info(
+                f"{user} has not connected Google account so cannot initialize a GoogleApiClient instance."
+            )
+            return
 
     def _encrypt_pw(self, password: str) -> str:
         """Generate salted password hash"""

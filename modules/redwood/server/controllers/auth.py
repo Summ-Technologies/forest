@@ -45,7 +45,7 @@ class GoogleLoginController(Resource):
 
 
 class GoogleLoginCallbackController(Resource):
-    post_args = {"callback_url": fields.String(required=True, data_key="callbackUrl")}
+    post_args = {"callback_url": fields.String(required=True)}
 
     @jwt.requires_auth
     @use_args(post_args)
