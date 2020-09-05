@@ -6,7 +6,11 @@ ARG PIP_TRUSTED_HOST
 
 # Install required packages
 COPY requirements.txt ./requirements.txt
-RUN pip install --pre -r requirements.txt
+RUN apk add postgresql-dev \
+    && apk add --virtual .build-deps libffi-dev gcc python3-dev musl-dev \
+    && pip install --pre --no-cache -r requirements.txt \
+    && rm requirements.txt \
+    && apk del .build-deps
 
 # Copy server code to the /app/ dir
 COPY ./app ./app
