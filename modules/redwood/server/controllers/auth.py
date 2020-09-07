@@ -6,12 +6,14 @@ from webargs import fields
 from webargs.flaskparser import use_args
 
 from redwood_core.user_manager import UserManager
+from redwood_rabbitmq import message_types, queue
 from summn_web import responses
 
-from .. import jwt, manager_factory
+from .. import jwt, manager_factory, rmq
 
 logger = logging.getLogger(__name__)
 user_manager: UserManager = manager_factory.get_manager("user")
+new_gmail_publisher = rmq.get_publisher(queue.NEW_GOOGLE_ACCOUNT_CONNECTED)
 
 
 class LoginController(Resource):
@@ -52,3 +54,6 @@ class GoogleLoginCallbackController(Resource):
     def post(self, args):
         user_manager.google_oauth_callback(g.user, args["callback_url"])
         user_manager.commit_changes()
+        new_gmail_publisher.publish(
+            message_types.ConnectedGoogleAccountMessage(g.user.id)
+        )
