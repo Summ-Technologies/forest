@@ -11,6 +11,30 @@ logger = logging.getLogger(__name__)
 
 
 class ContentManager(ManagerFactory):
+    def create_new_article(
+        self, user: User, title: str, source: str, content: str, html_content: str
+    ) -> Article:
+        """Creates a new article.
+        Adds, and flushes, but does not commit the article record.
+
+        Args:
+            user (User): user who owns the article
+            title (str): title
+            source (str): source
+            content (str): content
+            html_content (str): html_string
+        Returns:
+            (Article): newly created article record (uncommitted)
+        """
+        article = Article()
+        article.title = title
+        article.source = source
+        article.content = content
+        article.html_content = html_content
+        article.user_id = user.id
+        self.session.add(article)
+        self.session.flush()
+
     def get_article_by_id(self, id, user: User = None) -> Optional[Article]:
         """
         Get article by id. If user is passed, only return an article if the user is the owner of the article.

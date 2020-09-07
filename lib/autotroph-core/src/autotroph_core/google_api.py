@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Optional
+from typing import List, Optional
 
 import google.oauth2.credentials
 from googleapiclient.discovery import Resource, build
@@ -41,6 +41,53 @@ class GoogleApiClient:
         gmail_service = self.get_gmail_service()
         profile = gmail_service.users().getProfile(userId="me").execute()
         return profile
+
+    def get_email_from_address(self, id: str) -> str:
+        """Get sender of an email given the email id.
+
+        Args:
+            id (str): id of email in question
+
+        Returns:
+            str: from address for the email with id
+        """
+        gmail_service = self.get_gmail_service()
+        email_message = (
+            gmail_service.users()
+            .messages()
+            .get(userId="me", id=id, format="metadata", metadataHeaders="From")
+            .execute()
+        )
+        sender_address = GoogleApiClient._get_header_by_name(email_message, "From")
+        if sender_address:
+            return sender_address[0]
+
+    @staticmethod
+    def _get_header_by_name(gmail_message: str, header_name: str) -> List[str]:
+        """Get the value(s) of the header
+
+        Args:
+            gmail_message (str): gmail message of the resource type (Message)
+                https://developers.google.com/gmail/api/reference/rest/v1/users.messages#Message
+            header_name (str): name of header
+
+        Returns:
+            List[str]: list of values for the header
+        """
+        values = []
+        payload = gmail_message.get("payload", {})
+        headers = payload.get("headers", [])
+        values = list(
+            map(
+                lambda header: header.get("value"),
+                filter(
+                    lambda header: header.get("name") != None
+                    and header.get("name").lower() == header_name.lower(),
+                    headers,
+                ),
+            )
+        )
+        return values
 
     @staticmethod
     def init_api_client(credentials_json: str) -> GoogleApiClient:
