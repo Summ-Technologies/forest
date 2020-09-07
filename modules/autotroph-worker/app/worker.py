@@ -1,6 +1,7 @@
 import logging
 
 from redwood_core.content_manager import ContentManager
+from redwood_core.triage_manager import TriageManager
 from redwood_core.user_manager import UserManager
 from redwood_db.user import User
 from redwood_rabbitmq.message_types import ConnectedGoogleAccountMessage
@@ -26,6 +27,7 @@ def import_gmail_newsletters(
     session = db.setup_db_session(config["SQLALCHEMY_DATABASE_URI"])
     user_manager = UserManager(session=session, config=config)
     content_manager = ContentManager(session=session, config=config)
+    triage_manager: TriageManager = TriageManager(session=session, config=config)
 
     # Setup Logic
     user: User = session.query(User).get(message.user_id)
@@ -45,9 +47,20 @@ def import_gmail_newsletters(
         messages = message_list_resp.get("messages")
         # check if should add messages
         for message in messages:
-            from_address = google_api_client.get_email_from_address(message.get("id"))
-            if "substack" in from_address:
-                logger.info(f"SUBSTACK EMAIL! {message.get('id')}")
-                logger.info(f"FROM ADDRESS: {from_address}")
-
+            gmail_message_id = message.get("id")
+            if content_manager.is_email_newsletter(user, gmail_message_id):
+                logger.info(
+                    f"{user} gmail message id: {gmail_message_id} will be imported as whittle email."
+                )
+                new_article = content_manager.create_new_article_from_gmail(
+                    user, gmail_message_id
+                )
+                box = list(
+                    filter(
+                        lambda box: box.name.lower() == "inbox",
+                        triage_manager.get_boxes_for_user(user),
+                    )
+                )[0]
+                triage_manager.create_new_triage(new_article, box)
+                content_manager.commit_changes()
     logger.info(f"Completed gmail newsletter import for {message.serialize()}")

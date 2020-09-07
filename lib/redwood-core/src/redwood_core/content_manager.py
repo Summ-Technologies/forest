@@ -1,18 +1,84 @@
 import logging
 from typing import Optional
 
+from autotroph_core.google_api import GoogleApiClient
 from redwood_db.content import Article
 from redwood_db.triage import Box, Triage
 from redwood_db.user import User
 
 from .factory import ManagerFactory
+from .user_manager import UserManager
 
 logger = logging.getLogger(__name__)
 
 
 class ContentManager(ManagerFactory):
+    def is_email_newsletter(self, user: User, gmail_message_id: str) -> bool:
+        """Returns if the gmail message a newsletter that should be imported.
+
+        Args:
+            user (User):
+            gmail_message_id (str): gmail's id of email
+
+        Returns:
+            bool: is email whittle newsletter
+        """
+        user_manager: UserManager = self.get_manager("user")
+        google_api_client = user_manager._get_google_api_client(user)
+        from_address = google_api_client.get_email_from_address(gmail_message_id)
+        # TODO add logic determining if a message is a newsletter (like checking user's subscriptions in db)
+        if "substack" in from_address.lower():
+            return True
+        elif "newsletter" in from_address.lower():
+            return True
+        return False
+
+    def create_new_article_from_gmail(
+        self, user: User, gmail_message_id: str
+    ) -> Optional[Article]:
+        """Retrieves email from gmail and saves data as new article record.
+
+        Args:
+            user (User): [description]
+            gmail_message_id (str): [description]
+        
+        Returns:
+            (Article): newly added and flushed article record
+        """
+        user_manager: UserManager = self.get_manager("user")
+        google_api_client = user_manager._get_google_api_client(user)
+        gmail_message = (
+            google_api_client.get_gmail_service()
+            .users()
+            .messages()
+            .get(userId="me", id=gmail_message_id)
+            .execute()
+        )
+        title = GoogleApiClient.get_header_by_name(gmail_message, "Subject")[0]
+        source = GoogleApiClient.get_header_by_name(gmail_message, "From")[0]
+        html_content = google_api_client.get_email_html_body(gmail_message_id)
+        text_content = google_api_client.get_email_text_body(gmail_message_id)
+        return self.create_new_article(
+            user,
+            title,
+            source,
+            author=None,
+            outline=None,
+            text_content=text_content,
+            html_content=html_content,
+            gmail_message_id=gmail_message_id,
+        )
+
     def create_new_article(
-        self, user: User, title: str, source: str, content: str, html_content: str
+        self,
+        user: User,
+        title: str,
+        source: str,
+        author: str,
+        outline: str,
+        text_content: str,
+        html_content: str,
+        gmail_message_id: str,
     ) -> Article:
         """Creates a new article.
         Adds, and flushes, but does not commit the article record.
@@ -29,11 +95,15 @@ class ContentManager(ManagerFactory):
         article = Article()
         article.title = title
         article.source = source
-        article.content = content
+        article.author = author
+        article.outline = outline
+        article.text_content = text_content
         article.html_content = html_content
+        article.gmail_message_id = gmail_message_id
         article.user_id = user.id
         self.session.add(article)
         self.session.flush()
+        return article
 
     def get_article_by_id(self, id, user: User = None) -> Optional[Article]:
         """
