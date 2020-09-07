@@ -3,6 +3,10 @@ import os
 # SQLALCHEMY
 SQLALCHEMY_DATABASE_URI = os.environ.get("SQLALCHEMY_DATABASE_URI")
 
+# Google auth
+GOOGLE_OAUTH_SECRETS_FILE = os.environ.get("GOOGLE_OAUTH_SECRETS_FILE")
+GOOGLE_OAUTH_CALLBACK_URL = os.environ.get("GOOGLE_OAUTH_CALLBACK_URL")
+
 # Logging
 tmp = os.environ.get("SUMM_LOG_FILE")
 if tmp:
