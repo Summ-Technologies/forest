@@ -12,10 +12,13 @@ def route_v1(path: str):
 def add_routes(api: Api):
 
     ###### /auth ######
-    api.add_resource(auth.LoginController, route_v1("/auth/login"))
-    api.add_resource(auth.GoogleLoginController, route_v1("/auth/google/connect"))
+    api.add_resource(auth.GoogleLoginController, route_v1("/auth/google/login"))
     api.add_resource(
-        auth.GoogleLoginCallbackController, route_v1("/auth/google/callback")
+        auth.GoogleLoginCallbackController, route_v1("/auth/google/login/callback")
+    )
+    api.add_resource(auth.GmailPermissionsController, route_v1("/auth/gmail/login"))
+    api.add_resource(
+        auth.GmailPermissionsCallbackController, route_v1("/auth/google/gmail/callback")
     )
 
     ###### /user ######

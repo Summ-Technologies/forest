@@ -18,11 +18,23 @@ class UserManager(ManagerFactory):
 
     def get_google_account_email(self, user: User) -> Optional[str]:
         """Return email associated with the google account connected to the given user"""
-        google_api_client = self._get_google_api_client(user)
-        if google_api_client:
-            return google_api_client.get_user_profile().get("emailAddress")
+        gmail_api_client = self._get_gmail_api_client(user)
+        if gmail_api_client:
+            return gmail_api_client.get_user_profile().get("emailAddress")
 
-    def google_oauth_step1(self, user: User) -> str:
+    def google_login_step1(self) -> str:
+        google_auth_client: GoogleAuthClient = GoogleAuthClient(self.config)
+        auth_url, auth_state = google_auth_client.get_google_login_url()
+        return auth_url
+
+    def google_login_callback(self, callback_url: str) -> Optional[User]:
+        google_auth_client: GoogleAuthClient = GoogleAuthClient(self.config)
+        google_email_address = google_auth_client.validate_google_login(callback_url)
+        return (
+            self.session.query(User).filter_by(email=google_email_address).one_or_none()
+        )
+
+    def gmail_permissions_step1(self, user: User) -> str:
         """Step 1 when linking Redwood account with google account.
 
         Starts the google account linking process by first generating an oauth URL for
@@ -37,7 +49,7 @@ class UserManager(ManagerFactory):
             str: url where user can authenticate with Google account
         """
         google_auth_client: GoogleAuthClient = GoogleAuthClient(self.config)
-        auth_url, auth_state = google_auth_client.get_google_auth_url()
+        auth_url, auth_state = google_auth_client.get_gmail_auth_url()
         google_auth_state = GoogleAuthState()
         google_auth_state.state = auth_state
         google_auth_state.user_id = user.id
@@ -45,7 +57,7 @@ class UserManager(ManagerFactory):
         self.session.flush()
         return auth_url
 
-    def google_oauth_callback(self, user: User, callback_url: str) -> None:
+    def gmail_auth_callback(self, user: User, callback_url: str) -> None:
         """Saves google credentials for linked account.
 
         Args:
@@ -59,7 +71,7 @@ class UserManager(ManagerFactory):
         ).order_by(GoogleAuthState.created_at.desc()).filter(
             GoogleAuthState.created_at != None
         ).first()
-        google_auth_credentials = google_auth_client.validate_google_auth(
+        google_auth_credentials = google_auth_client.validate_gmail_auth(
             callback_url, google_auth_state.state
         )
         google_credential = GoogleAuthCredential()
@@ -82,7 +94,7 @@ class UserManager(ManagerFactory):
         if user is not None and self._check_pw(password, user.password_hash):
             return user
 
-    def _get_google_api_client(self, user: User) -> Optional[GoogleApiClient]:
+    def _get_gmail_api_client(self, user: User) -> Optional[GoogleApiClient]:
         """Create GoogleApiClient object for given user if they have connected their google account"""
         credentials_record: GoogleAuthCredential = self.session.query(
             GoogleAuthCredential

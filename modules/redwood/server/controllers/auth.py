@@ -16,32 +16,9 @@ user_manager: UserManager = manager_factory.get_manager("user")
 new_gmail_publisher = rmq.get_publisher(queue.NEW_GOOGLE_ACCOUNT_CONNECTED)
 
 
-class LoginController(Resource):
-
-    post_args = {
-        "email": fields.Email(required=True),
-        "password": fields.String(required=True),
-    }
-
-    @use_args(post_args)
-    def post(self, args):
-        """Validate user credentials and return JWT Token"""
-        email, password = args["email"], args["password"]
-        login_user = user_manager.authenicate_user(email, password)
-        if login_user:
-            cookie_name = jwt.jwt_cookie_name
-            jwt_token = jwt.encode_jwt(login_user.login_id)
-            headers = {"Set-Cookie": f"{cookie_name}={jwt_token}; Path=/; HttpOnly"}
-            ret = {"user": login_user.to_json()}
-            return responses.success(ret, extra_headers=headers)
-        return responses.error("Invalid email or password.", 422)
-
-
 class GoogleLoginController(Resource):
-    @jwt.requires_auth
     def get(self):
-        google_auth_url = user_manager.google_oauth_step1(g.user)
-        user_manager.commit_changes()
+        google_auth_url = user_manager.google_login_step1()
         ret = {"redirect_url": google_auth_url}
         return responses.success(ret)
 
@@ -49,10 +26,35 @@ class GoogleLoginController(Resource):
 class GoogleLoginCallbackController(Resource):
     post_args = {"callback_url": fields.String(required=True)}
 
+    @use_args(post_args)
+    def post(self, args):
+        login_user = user_manager.google_login_callback(args["callback_url"])
+        if login_user:
+            cookie_name = jwt.jwt_cookie_name
+            jwt_token = jwt.encode_jwt(login_user.login_id)
+            headers = {"Set-Cookie": f"{cookie_name}={jwt_token}; Path=/; HttpOnly"}
+            ret = {"user": login_user.to_json()}
+            return responses.success(ret, extra_headers=headers)
+        else:
+            return responses.error("There was an error logging in with google", 500)
+
+
+class GmailPermissionsController(Resource):
+    @jwt.requires_auth
+    def get(self):
+        google_auth_url = user_manager.gmail_permissions_step1(g.user)
+        user_manager.commit_changes()
+        ret = {"redirect_url": google_auth_url}
+        return responses.success(ret)
+
+
+class GmailPermissionsCallbackController(Resource):
+    post_args = {"callback_url": fields.String(required=True)}
+
     @jwt.requires_auth
     @use_args(post_args)
     def post(self, args):
-        user_manager.google_oauth_callback(g.user, args["callback_url"])
+        user_manager.gmail_auth_callback(g.user, args["callback_url"])
         user_manager.commit_changes()
         new_gmail_publisher.publish(
             message_types.ConnectedGoogleAccountMessage(g.user.id)

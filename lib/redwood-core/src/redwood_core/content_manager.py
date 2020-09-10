@@ -24,8 +24,8 @@ class ContentManager(ManagerFactory):
             bool: is email whittle newsletter
         """
         user_manager: UserManager = self.get_manager("user")
-        google_api_client = user_manager._get_google_api_client(user)
-        from_address = google_api_client.get_email_from_address(gmail_message_id)
+        gmail_api_client = user_manager._get_gmail_api_client(user)
+        from_address = gmail_api_client.get_email_from_address(gmail_message_id)
         # TODO add logic determining if a message is a newsletter (like checking user's subscriptions in db)
         if "substack" in from_address.lower():
             return True
@@ -46,9 +46,9 @@ class ContentManager(ManagerFactory):
             (Article): newly added and flushed article record
         """
         user_manager: UserManager = self.get_manager("user")
-        google_api_client = user_manager._get_google_api_client(user)
+        gmail_api_client = user_manager._get_gmail_api_client(user)
         gmail_message = (
-            google_api_client.get_gmail_service()
+            gmail_api_client.get_gmail_service()
             .users()
             .messages()
             .get(userId="me", id=gmail_message_id)
@@ -56,8 +56,8 @@ class ContentManager(ManagerFactory):
         )
         title = GoogleApiClient.get_header_by_name(gmail_message, "Subject")[0]
         source = GoogleApiClient.get_header_by_name(gmail_message, "From")[0]
-        html_content = google_api_client.get_email_html_body(gmail_message_id)
-        text_content = google_api_client.get_email_text_body(gmail_message_id)
+        html_content = gmail_api_client.get_email_html_body(gmail_message_id)
+        text_content = gmail_api_client.get_email_text_body(gmail_message_id)
         return self.create_new_article(
             user,
             title,

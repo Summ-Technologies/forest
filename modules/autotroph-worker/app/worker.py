@@ -31,8 +31,8 @@ def import_gmail_newsletters(
 
     # Setup Logic
     user: User = session.query(User).get(message.user_id)
-    google_api_client = user_manager._get_google_api_client(user)
-    gmail_service = google_api_client.get_gmail_service()
+    gmail_api_client = user_manager._get_gmail_api_client(user)
+    gmail_service = gmail_api_client.get_gmail_service()
 
     threadIds = set([])
     nextPageToken = None
