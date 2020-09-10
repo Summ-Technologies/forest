@@ -16,6 +16,23 @@ logger = logging.getLogger(__name__)
 class UserManager(ManagerFactory):
     PW_SALT = bcrypt.gensalt(rounds=12)
 
+    def create_user(
+        self, email: str, first_name: str, last_name: str
+    ) -> Optional[User]:
+        """Creates new user and their initial set of boxes"""
+        new_user = User()
+        new_user.email = email
+        new_user.first_name = first_name
+        new_user.last_name = last_name
+        new_user.password_hash = "NO WHITTLE PASSWORDS FOR NOW"
+        self.session.add(new_user)
+        self.session.flush()
+        triage_manager = self.get_manager("triage")
+        triage_manager.create_box_for_user(new_user, "Inbox")
+        triage_manager.create_box_for_user(new_user, "Queue")
+        triage_manager.create_box_for_user(new_user, "Library")
+        return new_user
+
     def get_google_account_email(self, user: User) -> Optional[str]:
         """Return email associated with the google account connected to the given user"""
         gmail_api_client = self._get_gmail_api_client(user)
