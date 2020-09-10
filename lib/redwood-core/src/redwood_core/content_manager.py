@@ -27,9 +27,7 @@ class ContentManager(ManagerFactory):
         gmail_api_client = user_manager._get_gmail_api_client(user)
         from_address = gmail_api_client.get_email_from_address(gmail_message_id)
         # TODO add logic determining if a message is a newsletter (like checking user's subscriptions in db)
-        if "substack" in from_address.lower():
-            return True
-        elif "newsletter" in from_address.lower():
+        if "@substack.com" in from_address.lower():
             return True
         return False
 

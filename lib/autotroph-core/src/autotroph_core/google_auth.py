@@ -67,9 +67,7 @@ class GoogleAuthClient:
         flow.redirect_uri = self._create_callback_url(self.GMAIL_CALLBACK_PATH_POSTFIX)
 
         authorization_url, state = flow.authorization_url(
-            access_type="offline",
-            include_granted_scopes="true",
-            prompt="select_account",
+            access_type="offline", prompt="consent",
         )
 
         return authorization_url, state

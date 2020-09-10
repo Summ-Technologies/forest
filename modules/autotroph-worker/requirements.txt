@@ -1,3 +1,4 @@
+beautifulsoup4
 psycopg2
 sqlalchemy
 summn-logging<=0.1.0
