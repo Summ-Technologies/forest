@@ -16,7 +16,7 @@ def add_routes(api: Api):
     api.add_resource(
         auth.GoogleLoginCallbackController, route_v1("/auth/google/login/callback")
     )
-    api.add_resource(auth.GmailPermissionsController, route_v1("/auth/gmail/login"))
+    api.add_resource(auth.GmailPermissionsController, route_v1("/auth/google/gmail"))
     api.add_resource(
         auth.GmailPermissionsCallbackController, route_v1("/auth/google/gmail/callback")
     )
