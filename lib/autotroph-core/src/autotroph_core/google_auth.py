@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Optional
+from typing import Optional, Tuple
 
 import google.oauth2.credentials
 import google_auth_oauthlib.flow
@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 class GoogleAuthClient:
 
     ## Defaults
-    DEFAULT_SCOPE = ["https://www.googleapis.com/auth/gmail.readonly"]
+    DEFAULT_GMAIL_SCOPE = ["https://www.googleapis.com/auth/gmail.readonly"]
 
     LOGIN_SCOPE = [
         "openid",
@@ -21,13 +21,14 @@ class GoogleAuthClient:
         "https://www.googleapis.com/auth/userinfo.profile",
     ]
 
+    SIGNUP_CALLBACK_PATH_POSTFIX = "signup"
     LOGIN_CALLBACK_PATH_POSTFIX = "login"
     GMAIL_CALLBACK_PATH_POSTFIX = "gmail"
 
     ## Config keys
     SECRETS_FILE_KEY = "GOOGLE_OAUTH_SECRETS_FILE"  # required
     CALLBACK_URL_KEY = "GOOGLE_OAUTH_CALLBACK_URL"  # required
-    SCOPE_KEY = "GOOGLE_OAUTH_SCOPE"  # optional
+    GMAIL_SCOPE_KEY = "GOOGLE_OAUTH_GMAIL_SCOPE"  # optional
 
     config: dict = None
 
@@ -35,8 +36,31 @@ class GoogleAuthClient:
         self.config = config
         assert self.config.get(self.SECRETS_FILE_KEY) != None
         assert self.config.get(self.CALLBACK_URL_KEY) != None
-        if self.config.get(self.SCOPE_KEY) == None:
-            self.config[self.SCOPE_KEY] = self.DEFAULT_SCOPE
+        if self.config.get(self.GMAIL_SCOPE_KEY) == None:
+            self.config[self.GMAIL_SCOPE_KEY] = self.DEFAULT_GMAIL_SCOPE
+
+    def get_google_signup_url(self) -> str:
+        flow = google_auth_oauthlib.flow.Flow.from_client_secrets_file(
+            self.config.get(self.SECRETS_FILE_KEY), self.LOGIN_SCOPE,
+        )
+        flow.redirect_uri = self._create_callback_url(self.SIGNUP_CALLBACK_PATH_POSTFIX)
+
+        authorization_url, state = flow.authorization_url(prompt="select_account")
+        return authorization_url, state
+
+    def validate_google_signup(self, auth_resp_url) -> Tuple[str, str, str]:
+        """Validates the code given by the callback and returns the email address of the google user"""
+        flow: google_auth_oauthlib.flow.Flow = google_auth_oauthlib.flow.Flow.from_client_secrets_file(
+            self.config.get(self.SECRETS_FILE_KEY), scopes=self.LOGIN_SCOPE,
+        )
+        flow.redirect_uri = self._create_callback_url(self.SIGNUP_CALLBACK_PATH_POSTFIX)
+        flow.fetch_token(authorization_response=auth_resp_url)
+        credentials: google.oauth2.credentials.Credentials = flow.credentials
+        print(credentials.id_token)
+        email = jwt.decode(credentials.id_token, verify=False).get("email")
+        first_name = jwt.decode(credentials.id_token, verify=False).get("given_name")
+        last_name = jwt.decode(credentials.id_token, verify=False).get("family_name")
+        return email, first_name, last_name
 
     def get_google_login_url(self):
         flow = google_auth_oauthlib.flow.Flow.from_client_secrets_file(
@@ -62,7 +86,8 @@ class GoogleAuthClient:
         """Build a URL to redirect users to allowing them to grant Redwood access to their google account"""
 
         flow = google_auth_oauthlib.flow.Flow.from_client_secrets_file(
-            self.config.get(self.SECRETS_FILE_KEY), self.config.get(self.SCOPE_KEY),
+            self.config.get(self.SECRETS_FILE_KEY),
+            self.config.get(self.GMAIL_SCOPE_KEY),
         )
         flow.redirect_uri = self._create_callback_url(self.GMAIL_CALLBACK_PATH_POSTFIX)
 
@@ -85,7 +110,7 @@ class GoogleAuthClient:
 
         flow: google_auth_oauthlib.flow.Flow = google_auth_oauthlib.flow.Flow.from_client_secrets_file(
             self.config.get(self.SECRETS_FILE_KEY),
-            scopes=self.config.get(self.SCOPE_KEY),
+            scopes=self.config.get(self.GMAIL_SCOPE_KEY),
             state=google_state,
         )
         flow.redirect_uri = self._create_callback_url(self.GMAIL_CALLBACK_PATH_POSTFIX)

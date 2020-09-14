@@ -1,7 +1,9 @@
 import logging
-from typing import Dict, Optional
+from typing import Dict, Optional, Tuple
 
 import bcrypt
+from psycopg2.errorcodes import FOREIGN_KEY_VIOLATION, UNIQUE_VIOLATION
+from sqlalchemy.exc import IntegrityError
 
 from autotroph_core.google_api import GoogleApiClient
 from autotroph_core.google_auth import GoogleAuthClient
@@ -50,6 +52,40 @@ class UserManager(ManagerFactory):
         return (
             self.session.query(User).filter_by(email=google_email_address).one_or_none()
         )
+
+    def google_signup_step1(self, gmail_permissions=False) -> str:
+        google_auth_client: GoogleAuthClient = GoogleAuthClient(self.config)
+        auth_url, auth_state = google_auth_client.get_google_signup_url()
+        return auth_url
+
+    def google_signup_callback(self, callback_url: str) -> Tuple[Optional[User], str]:
+        """TODO add whitelist and error codes for different reasons signup failed"""
+        google_auth_client: GoogleAuthClient = GoogleAuthClient(self.config)
+        (
+            google_email_address,
+            first_name,
+            last_name,
+        ) = google_auth_client.validate_google_signup(callback_url)
+        if google_email_address:  # TODO add whitelist here
+            try:
+                new_user = self.create_user(google_email_address, first_name, last_name)
+                if new_user:
+                    self.commit_changes()
+                    return new_user
+            except IntegrityError as e:
+                self.session.rollback()
+                if e.orig.pgcode == UNIQUE_VIOLATION:
+                    logger.info(
+                        f"Account already exists for email: {google_email_address}"
+                    )
+                    return (
+                        self.session.query(User)
+                        .filter_by(email=google_email_address)
+                        .one_or_none()
+                    )
+                else:
+                    raise e
+        return None
 
     def gmail_permissions_step1(self, user: User) -> str:
         """Step 1 when linking Redwood account with google account.
