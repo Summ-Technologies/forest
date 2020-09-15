@@ -7,7 +7,7 @@ from sqlalchemy.exc import IntegrityError
 
 from autotroph_core.google_api import GoogleApiClient
 from autotroph_core.google_auth import GoogleAuthClient
-from redwood_db.auth import GoogleAuthCredential, GoogleAuthState
+from redwood_db.google import GoogleAuthCredential, GoogleAuthState, GoogleHistoryId
 from redwood_db.user import User
 
 from .factory import ManagerFactory
@@ -35,9 +35,27 @@ class UserManager(ManagerFactory):
         triage_manager.create_box_for_user(new_user, "Library")
         return new_user
 
+    def get_latest_history_id(self, user: User) -> Optional[str]:
+        history_id_record = (
+            self.session.query(GoogleHistoryId)
+            .order_by(GoogleHistoryId.created_at.desc())
+            .filter_by(user_id=user.id)
+            .first()
+        )
+        if history_id_record:
+            return history_id_record.history_id
+
+    def create_history_id(self, user: User, current_history_id: str) -> GoogleHistoryId:
+        new_history_id = GoogleHistoryId()
+        new_history_id.history_id = current_history_id
+        new_history_id.user_id = user.id
+        self.session.add(new_history_id)
+        self.session.flush()
+        return new_history_id
+
     def get_google_account_email(self, user: User) -> Optional[str]:
         """Return email associated with the google account connected to the given user"""
-        gmail_api_client = self._get_gmail_api_client(user)
+        gmail_api_client = self.get_gmail_api_client(user)
         if gmail_api_client:
             return gmail_api_client.get_user_profile().get("emailAddress")
 
@@ -147,7 +165,7 @@ class UserManager(ManagerFactory):
         if user is not None and self._check_pw(password, user.password_hash):
             return user
 
-    def _get_gmail_api_client(self, user: User) -> Optional[GoogleApiClient]:
+    def get_gmail_api_client(self, user: User) -> Optional[GoogleApiClient]:
         """Create GoogleApiClient object for given user if they have connected their google account"""
         credentials_record: GoogleAuthCredential = self.session.query(
             GoogleAuthCredential

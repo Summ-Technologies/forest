@@ -1,5 +1,8 @@
 import logging
-from typing import Optional
+from typing import List, Optional
+
+from bs4 import BeautifulSoup
+from sqlalchemy import and_, exists
 
 from autotroph_core.google_api import GoogleApiClient
 from redwood_db.content import Article
@@ -13,6 +16,21 @@ logger = logging.getLogger(__name__)
 
 
 class ContentManager(ManagerFactory):
+    def get_new_emails(self, user: User) -> List[str]:
+        """
+        Returns message_ids for all emails since history_id.
+        If history_id is None then returns all message_ids from the past 2 weeks
+
+        Note, this message adds the current history_id for the given user to the databse
+        session so the session does need to be committed after calling this method.
+        """
+        user_manager = self.get_manager("user")
+        gmail_api_client = user_manager.get_gmail_api_client(user)
+        history_id = user_manager.get_latest_history_id(user)
+        latest_emails, current_history_id = gmail_api_client.get_new_emails(history_id)
+        user_manager.create_history_id(user, current_history_id)
+        return latest_emails
+
     def is_email_newsletter(self, user: User, gmail_message_id: str) -> bool:
         """Returns if the gmail message a newsletter that should be imported.
 
@@ -24,48 +42,65 @@ class ContentManager(ManagerFactory):
             bool: is email whittle newsletter
         """
         user_manager: UserManager = self.get_manager("user")
-        gmail_api_client = user_manager._get_gmail_api_client(user)
-        from_address = gmail_api_client.get_email_from_address(gmail_message_id)
+        gmail_api_client = user_manager.get_gmail_api_client(user)
+        gmail_message = gmail_api_client.get_email(gmail_message_id, format="metadata")
+        name, from_address = GoogleApiClient.get_email_from_address(gmail_message)
         # TODO add logic determining if a message is a newsletter (like checking user's subscriptions in db)
         if "@substack.com" in from_address.lower():
             return True
         return False
 
     def create_new_article_from_gmail(
-        self, user: User, gmail_message_id: str
+        self, user: User, gmail_message: dict, move_to_library: bool = False
     ) -> Optional[Article]:
         """Retrieves email from gmail and saves data as new article record.
 
         Args:
-            user (User): [description]
-            gmail_message_id (str): [description]
+            user (User):
+            gmail_message_id (str):
+            move_to_library (bool): triage to library instead of inbox
         
         Returns:
             (Article): newly added and flushed article record
         """
-        user_manager: UserManager = self.get_manager("user")
-        gmail_api_client = user_manager._get_gmail_api_client(user)
-        gmail_message = (
-            gmail_api_client.get_gmail_service()
-            .users()
-            .messages()
-            .get(userId="me", id=gmail_message_id)
-            .execute()
-        )
+        user_manager = self.get_manager("user")
+        gmail_message_id = gmail_message["id"]
         title = GoogleApiClient.get_header_by_name(gmail_message, "Subject")[0]
-        source = GoogleApiClient.get_header_by_name(gmail_message, "From")[0]
-        html_content = gmail_api_client.get_email_html_body(gmail_message_id)
-        text_content = gmail_api_client.get_email_text_body(gmail_message_id)
-        return self.create_new_article(
-            user,
-            title,
-            source,
-            author=None,
-            outline=None,
-            text_content=text_content,
-            html_content=html_content,
-            gmail_message_id=gmail_message_id,
+        author, source = GoogleApiClient.get_email_from_address(gmail_message)
+        html_content = GoogleApiClient.get_email_html_body(gmail_message)
+        text_content = GoogleApiClient.get_email_text_body(gmail_message)
+        outline = self.generate_outline(html_content)
+        ((gmail_message_exists,),) = self.session.query(
+            exists().where(
+                and_(
+                    Article.gmail_message_id == gmail_message_id,
+                    Article.user_id == user.id,
+                )
+            )
         )
+        if gmail_message_exists:
+            logger.warning(
+                f"{user} attempting to create article from email with id: {gmail_message_id} but this id exists in the articles table already."
+            )
+        else:
+            new_article = self.create_new_article(
+                user,
+                title,
+                source,
+                author=author,
+                outline=outline,
+                text_content=text_content,
+                html_content=html_content,
+                gmail_message_id=gmail_message_id,
+            )
+            if new_article:
+                triage_manager = self.get_manager("triage")
+                if move_to_library:
+                    box = triage_manager.get_user_library(user)
+                else:
+                    box = triage_manager.get_user_inbox(user)
+                triage_manager.create_new_triage(new_article, box)
+                return new_article
 
     def create_new_article(
         self,
@@ -149,3 +184,18 @@ class ContentManager(ManagerFactory):
             self.session.add(article)
             self.session.flush()
         return article
+
+    def generate_outline(self, html_content: str):
+        outline = ""
+        soup = BeautifulSoup(html_content, "html.parser")
+        for header in soup.find_all(["h1", "h2", "h3"]):
+            if header.name == "h1":
+                outline += f"##### [{header.get_text()}](#)"
+                outline += "  \n\n"
+            elif header.name == "h2":
+                outline += f"[**{header.get_text()}**](#)"
+                outline += "  \n\n"
+            elif header.name == "h3":
+                outline += f"- [**{header.get_text()}**](#)"
+                outline += "  \n\n"
+        return outline

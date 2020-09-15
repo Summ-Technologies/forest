@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import email.utils
 import logging
 from base64 import urlsafe_b64decode
-from typing import List, Optional
+from datetime import datetime, timedelta
+from typing import List, Optional, Tuple
 
 import google.oauth2.credentials
 from googleapiclient.discovery import Resource, build
@@ -27,6 +29,106 @@ class GoogleApiClient:
             self.gmail_service = build("gmail", "v1", credentials=self.credentials)
         return self.gmail_service
 
+    def get_new_emails(self, history_id: str) -> Tuple[List[str], str]:
+        """
+        Returns new emails added since history_id and the current_history_id
+        TODO: exception handling when history_list with given id returns a 404
+        """
+        new_email_ids = []
+        current_history_id = None
+
+        if history_id is None:
+            gmail_service = self.get_gmail_service()
+            two_weeks_ago = datetime.utcnow() - timedelta(
+                days=15
+            )  # 2weeks + 1day to be safe
+            query = f"after:{two_weeks_ago.strftime('%Y/%m/%d')}"
+
+            next_page_token = None
+            is_first = True
+            while next_page_token != None or is_first:
+                message_list_resp = (
+                    gmail_service.users()
+                    .messages()
+                    .list(
+                        userId="me", maxResults=500, pageToken=next_page_token, q=query,
+                    )
+                    .execute()
+                )
+                next_page_token = message_list_resp.get("nextPageToken", None)
+                _message_ids = list(
+                    map(
+                        lambda mess: mess.get("id"),
+                        message_list_resp.get("messages", []),
+                    )
+                )
+                new_email_ids.extend(_message_ids)
+                if is_first:
+                    is_first = False
+                    ### To get the current history id, get message data for first message in inbox
+                    ### See for more details: https://developers.google.com/gmail/api/guides/sync
+                    if len(_message_ids):
+                        first_message_id = _message_ids[0]
+                        current_history_id = (
+                            gmail_service.users()
+                            .messages()
+                            .get(userId="me", id=first_message_id, format="minimal")
+                            .execute()
+                            .get("historyId")
+                        )
+        else:
+            is_first = True
+            next_page_token = None
+            while next_page_token != None or is_first:
+                (
+                    _new_email_ids,
+                    next_page_token,
+                    current_history_id,
+                ) = self._list_history(history_id, None)
+                new_email_ids.extend(_new_email_ids)
+                if is_first:
+                    is_first = False
+
+        return new_email_ids, current_history_id
+
+    def _list_history(
+        self, history_id: str, page_token: str
+    ) -> Tuple[List[str], Optional[str], str]:
+        """Return Tuple[message_ids, nextPageToken, currentHistoryId]"""
+        gmail_service = self.get_gmail_service()
+        message_ids = []
+        history_response = (
+            gmail_service.users()
+            .history()
+            .list(
+                userId="me",
+                startHistoryId=history_id,
+                pageToken=page_token,
+                historyTypes="messageAdded",
+            )
+            .execute()
+        )
+        nextPageToken = history_response.get("nextPageToken")
+        current_history_id = history_response.get("historyId")
+        histories = history_response.get("history", [])
+        for history in histories:
+            messages_added = history.get("messagesAdded", [])
+            for message_added in messages_added:
+                message_added_id = message_added.get("message", {}).get("id")
+                if message_added_id != None:
+                    message_ids.append(message_added_id)
+        return message_ids, nextPageToken, current_history_id
+
+    def get_email(self, gmail_message_id: str, format: str = "full") -> dict:
+        gmail_service = self.get_gmail_service()
+        gmail_message = (
+            gmail_service.users()
+            .messages()
+            .get(userId="me", id=gmail_message_id, format=format)
+            .execute()
+        )
+        return gmail_message
+
     def get_user_profile(self) -> dict:
         """Get gmail user profile for the user with credentials associated to this object
 
@@ -43,27 +145,22 @@ class GoogleApiClient:
         profile = gmail_service.users().getProfile(userId="me").execute()
         return profile
 
-    def get_email_from_address(self, gmail_id: str) -> str:
+    @staticmethod
+    def get_email_from_address(gmail_message: str) -> Tuple[str, str]:
         """Get sender of an email given the email id.
 
         Args:
             gmail_id (str): id of email in question
 
         Returns:
-            str: from address for the email with id
+            Tuple[str, str]: (name, email address)
         """
-        gmail_service = self.get_gmail_service()
-        email_message = (
-            gmail_service.users()
-            .messages()
-            .get(userId="me", id=gmail_id, format="metadata", metadataHeaders="From")
-            .execute()
-        )
-        sender_address = GoogleApiClient.get_header_by_name(email_message, "From")
+        sender_address = GoogleApiClient.get_header_by_name(gmail_message, "From")
         if sender_address:
-            return sender_address[0]
+            return email.utils.parseaddr(sender_address[0])
 
-    def get_email_html_body(self, gmail_id: str) -> Optional[str]:
+    @staticmethod
+    def get_email_html_body(gmail_message) -> Optional[str]:
         """Get the html body from an email.
 
         Args:
@@ -72,10 +169,6 @@ class GoogleApiClient:
         Returns:
             str: html string for body
         """
-        gmail_service = self.get_gmail_service()
-        gmail_message = (
-            gmail_service.users().messages().get(userId="me", id=gmail_id).execute()
-        )
         content_type = GoogleApiClient.get_header_by_name(gmail_message, "Content-Type")
         if content_type and "multipart/alternative" in content_type[0]:
             ## get body from parts
@@ -102,7 +195,8 @@ class GoogleApiClient:
         )
         return None
 
-    def get_email_text_body(self, gmail_id: str) -> Optional[str]:
+    @staticmethod
+    def get_email_text_body(gmail_message: str) -> Optional[str]:
         """Get the text body from an email.
 
         Args:
@@ -111,10 +205,6 @@ class GoogleApiClient:
         Returns:
             str: text string for body
         """
-        gmail_service = self.get_gmail_service()
-        gmail_message = (
-            gmail_service.users().messages().get(userId="me", id=gmail_id).execute()
-        )
         content_type = GoogleApiClient.get_header_by_name(gmail_message, "Content-Type")
         if content_type and "multipart/alternative" in content_type[0]:
             ## get body from parts

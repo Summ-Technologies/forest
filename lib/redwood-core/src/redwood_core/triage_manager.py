@@ -1,6 +1,8 @@
 import logging
 from typing import Optional
 
+from sqlalchemy import func
+
 from redwood_db.content import Article
 from redwood_db.triage import Box, Triage
 from redwood_db.user import User
@@ -71,3 +73,19 @@ class TriageManager(ManagerFactory):
                 logger.info(
                     f"{user} tried to triage {article} to {box} but it already existed in that box."
                 )
+
+    def get_user_inbox(self, user: User) -> Box:
+        return (
+            self.session.query(Box)
+            .filter(func.lower(Box.name) == "inbox")
+            .filter_by(user_id=user.id)
+            .one()
+        )
+
+    def get_user_library(self, user: User) -> Box:
+        return (
+            self.session.query(Box)
+            .filter(func.lower(Box.name) == "library")
+            .filter_by(user_id=user.id)
+            .one()
+        )
