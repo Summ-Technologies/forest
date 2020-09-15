@@ -1,5 +1,5 @@
 import logging
-from typing import Dict, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 import bcrypt
 from psycopg2.errorcodes import FOREIGN_KEY_VIOLATION, UNIQUE_VIOLATION
@@ -17,6 +17,17 @@ logger = logging.getLogger(__name__)
 
 class UserManager(ManagerFactory):
     PW_SALT = bcrypt.gensalt(rounds=12)
+
+    def get_users_with_gmail_permissions(self) -> List[User]:
+        user_ids_with_credentials = map(
+            lambda id_tuples: id_tuples[0],
+            self.session.query(GoogleAuthCredential.user_id).all(),
+        )
+        return (
+            self.session.query(User)
+            .filter(User.id.in_(user_ids_with_credentials))
+            .all()
+        )
 
     def create_user(
         self, email: str, first_name: str, last_name: str

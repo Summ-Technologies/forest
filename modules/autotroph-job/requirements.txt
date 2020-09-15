@@ -1,0 +1,6 @@
+psycopg2
+sqlalchemy
+summn-logging<=0.1.0
+redwood-db<=0.1.0
+redwood-core<=0.1.0
+autotroph-core<=0.1.0
