@@ -1,8 +1,6 @@
 import logging
 from typing import List, Tuple
 
-import pika
-
 from . import _config
 from .worker import sync_gmail
 
