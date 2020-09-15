@@ -19,6 +19,16 @@ new_gmail_publisher = rmq.get_publisher(queue.NEW_GOOGLE_ACCOUNT_CONNECTED)
 callback_post_args = {"callback_url": fields.String(required=True)}
 
 
+class LoginController(Resource):
+    @jwt.requires_auth
+    def delete(self):
+        """Sets empty cookie (to simulate logging out)"""
+        cookie_name = jwt.jwt_cookie_name
+        return responses.success(
+            "Successfully logged out.", 200, {"Set-Cookie": f"{cookie_name}=''" ""}
+        )
+
+
 class GoogleSignupController(Resource):
     def get(self):
         google_auth_url = user_manager.google_signup_step1()

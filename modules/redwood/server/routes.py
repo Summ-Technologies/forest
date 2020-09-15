@@ -12,6 +12,7 @@ def route_v1(path: str):
 def add_routes(api: Api):
 
     ###### /auth ######
+    api.add_resource(auth.LoginController, route_v1("/auth/login"))
     api.add_resource(auth.GoogleLoginController, route_v1("/auth/google/login"))
     api.add_resource(
         auth.GoogleLoginCallbackController, route_v1("/auth/google/login/callback")
