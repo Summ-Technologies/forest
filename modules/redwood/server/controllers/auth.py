@@ -24,9 +24,8 @@ class LoginController(Resource):
     def delete(self):
         """Sets empty cookie (to simulate logging out)"""
         cookie_name = jwt.jwt_cookie_name
-        return responses.success(
-            "Successfully logged out.", 200, {"Set-Cookie": f"{cookie_name}=''" ""}
-        )
+        headers = {"Set-Cookie": f"{cookie_name}=" "; Path=/; HttpOnly"}
+        return responses.success("Successfully logged out.", 200, headers)
 
 
 class GoogleSignupController(Resource):
