@@ -23,7 +23,7 @@ class BoxListController(Resource):
         Get all boxes for the logged in user.
         """
         boxes = triage_manager.get_boxes_for_user(g.user)
-        return responses.success(list(map(lambda box: box.to_json(), boxes)))
+        return responses.success({"boxes": list(map(lambda box: box.to_json(), boxes))})
 
 
 class TriageController(Resource):

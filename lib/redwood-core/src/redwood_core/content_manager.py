@@ -16,6 +16,15 @@ logger = logging.getLogger(__name__)
 
 
 class ContentManager(ManagerFactory):
+    """Manages content (like articles)
+
+    Config options available:
+        BOX_PAGE_SIZE, number of articles in a single page for a box
+
+    """
+
+    DEFAULT_BOX_PAGE_SIZE = 50
+
     def get_new_emails(self, user: User) -> List[str]:
         """
         Returns message_ids for all emails since history_id.
@@ -155,7 +164,31 @@ class ContentManager(ManagerFactory):
         else:
             return article
 
-    def get_articles_by_box_id(self, user: User, box_id: int):
+    def get_num_articles_by_box_id(self, user: User, box_id: int) -> int:
+        user_articles = self.session.query(Article.id).filter_by(user_id=user.id)
+        article_count = (
+            self.session.query(Triage.article_id)
+            .filter(Triage.article_id.in_(user_articles))
+            .filter_by(box_id=box_id)
+            .filter_by(is_active=True)
+            .count()
+        )
+        return article_count
+
+    def get_articles_by_box_id(
+        self, user: User, box_id: int, page_number: int
+    ) -> List[Article]:
+        """Gets the articles for given box id and page.
+
+        Args:
+            user (User): user requesting articles
+            box_id (int): id of box articles in
+            page_number (int): page number of query
+
+        Returns:
+            List[Article]: list of article resources
+        """
+        page_size = self.config.get("BOX_PAGE_SIZE", self.DEFAULT_BOX_PAGE_SIZE)
         user_articles = self.session.query(Article.id).filter_by(user_id=user.id)
         article_ids = (
             self.session.query(Triage.article_id)
@@ -163,11 +196,12 @@ class ContentManager(ManagerFactory):
             .filter_by(box_id=box_id)
             .filter_by(is_active=True)
             .order_by(Triage.created_at.asc())
+            .limit(page_size)
+            .offset(page_size * page_number)
         )
-        return [
-            self.session.query(Article).get(article_id)
-            for article_id in article_ids.all()
-        ]
+        articles = self.session.query(Article).filter(Article.id.in_(article_ids)).all()
+        articles_map = {article.id: article for article in articles}
+        return [articles_map[article_id] for (article_id,) in article_ids]
 
     def bookmark_article(self, article: Article) -> Article:
         """Add bookmarked to article"""

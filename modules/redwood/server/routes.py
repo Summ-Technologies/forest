@@ -1,6 +1,6 @@
 from flask_restful import Api
 
-from .controllers import admin, article, auth, triage, user
+from .controllers import article, auth, home, triage, user
 
 V1_PREFIX = "/v1.0"
 
@@ -28,6 +28,9 @@ def add_routes(api: Api):
 
     ###### /user ######
 
+    # /user/home
+    api.add_resource(home.UserHomeController, route_v1("/user/home"))
+
     # /user/boxes
     api.add_resource(triage.BoxListController, route_v1("/user/boxes"))
     api.add_resource(
@@ -45,7 +48,3 @@ def add_routes(api: Api):
 
     # /user/google/email
     api.add_resource(user.UserGoogleAccountController, route_v1("/user/google/email"))
-
-    # /user/admin (TODO remove this endpoint)
-    api.add_resource(article.NewArticleController, route_v1("/user/admin/articles"))
-    api.add_resource(admin.NewUserController, route_v1("/admin/user"))
