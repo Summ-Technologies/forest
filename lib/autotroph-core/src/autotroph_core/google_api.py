@@ -8,6 +8,7 @@ from typing import List, Optional, Tuple
 
 import google.oauth2.credentials
 from googleapiclient.discovery import Resource, build
+from googleapiclient.errors import HttpError
 
 logger = logging.getLogger(__name__)
 
@@ -51,7 +52,10 @@ class GoogleApiClient:
                     gmail_service.users()
                     .messages()
                     .list(
-                        userId="me", maxResults=500, pageToken=next_page_token, q=query,
+                        userId="me",
+                        maxResults=500,
+                        pageToken=next_page_token,
+                        q=query,
                     )
                     .execute()
                 )
@@ -119,14 +123,21 @@ class GoogleApiClient:
                     message_ids.append(message_added_id)
         return message_ids, nextPageToken, current_history_id
 
-    def get_email(self, gmail_message_id: str, format: str = "full") -> dict:
+    def get_email(self, gmail_message_id: str, format: str = "full") -> Optional[dict]:
         gmail_service = self.get_gmail_service()
-        gmail_message = (
-            gmail_service.users()
-            .messages()
-            .get(userId="me", id=gmail_message_id, format=format)
-            .execute()
-        )
+        try:
+            gmail_message = (
+                gmail_service.users()
+                .messages()
+                .get(userId="me", id=gmail_message_id, format=format)
+                .execute()
+            )
+        except HttpError as e:
+            if e.resp.status == 404:
+                return None
+            else:
+                logger.error(f"Error getting email with exception", exc_info=HttpError)
+                return None
         return gmail_message
 
     def get_user_profile(self) -> dict:

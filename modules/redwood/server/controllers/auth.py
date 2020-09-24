@@ -38,17 +38,19 @@ class GoogleSignupController(Resource):
 class GoogleSignupCallbackController(Resource):
     @use_args(callback_post_args)
     def post(self, args):
-        new_user = user_manager.google_signup_callback(args["callback_url"])
+        (new_user, signup_outcome) = user_manager.google_signup_callback(
+            args["callback_url"]
+        )
         if new_user:
             cookie_name = jwt.jwt_cookie_name
             jwt_token = jwt.encode_jwt(new_user.login_id)
             headers = {"Set-Cookie": f"{cookie_name}={jwt_token}; Path=/; HttpOnly"}
             ret = {"user": new_user.to_json()}
+            if signup_outcome.is_error():
+                ret.update(signup_outcome.error_json)
             return responses.success(ret, extra_headers=headers)
         else:
-            return responses.error(
-                "There was an error signing up with google account", 500
-            )
+            return responses.error(signup_outcome.error_json, 500)
 
 
 class GoogleLoginController(Resource):

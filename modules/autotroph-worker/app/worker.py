@@ -36,16 +36,17 @@ def import_gmail_newsletters(
     for gmail_message_id in messages:
         if content_manager.is_email_newsletter(user, gmail_message_id):
             gmail_message = gmail_api_client.get_email(gmail_message_id)
-            logger.info(
-                f"{user} gmail message id: {gmail_message_id} will be imported as whittle email."
-            )
-            if "UNREAD" in gmail_message.get("labelIds"):
-                move_to_library = False
-            else:
-                move_to_library = True
-            new_article = content_manager.create_new_article_from_gmail(
-                user, gmail_message, move_to_library
-            )
-            content_manager.commit_changes()
+            if gmail_message:
+                logger.info(
+                    f"{user} gmail message id: {gmail_message_id} will be imported as whittle email."
+                )
+                if "UNREAD" in gmail_message.get("labelIds"):
+                    move_to_library = False
+                else:
+                    move_to_library = True
+                new_article = content_manager.create_new_article_from_gmail(
+                    user, gmail_message, move_to_library
+                )
+                content_manager.commit_changes()
     logger.info(f"Completed gmail newsletter import for {message.serialize()}")
     session.close()

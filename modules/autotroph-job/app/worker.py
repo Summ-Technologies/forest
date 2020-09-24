@@ -34,13 +34,14 @@ def sync_gmail():
             for gmail_message_id in messages:
                 if content_manager.is_email_newsletter(user, gmail_message_id):
                     gmail_message = gmail_api_client.get_email(gmail_message_id)
-                    logger.info(
-                        f"{user} gmail message id: {gmail_message_id} will be imported as whittle email."
-                    )
-                    new_article = content_manager.create_new_article_from_gmail(
-                        user, gmail_message
-                    )
-            content_manager.commit_changes()
+                    if gmail_message:
+                        logger.info(
+                            f"{user} gmail message id: {gmail_message_id} will be imported as whittle email."
+                        )
+                        new_article = content_manager.create_new_article_from_gmail(
+                            user, gmail_message
+                        )
+                        content_manager.commit_changes()
         except Exception as e:
             logger.warning(
                 f"Exception encountered trying to sync gmail for {user}.", exc_info=e

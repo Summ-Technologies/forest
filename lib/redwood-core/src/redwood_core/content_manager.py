@@ -1,7 +1,6 @@
 import logging
 from typing import List, Optional
 
-from bs4 import BeautifulSoup
 from sqlalchemy import and_, exists
 
 from autotroph_core.google_api import GoogleApiClient
@@ -9,6 +8,7 @@ from redwood_db.content import Article
 from redwood_db.triage import Box, Triage
 from redwood_db.user import User
 
+from .article import ArticleUtils, SourceType
 from .factory import ManagerFactory
 from .user_manager import UserManager
 
@@ -51,10 +51,11 @@ class ContentManager(ManagerFactory):
         user_manager: UserManager = self.get_manager("user")
         gmail_api_client = user_manager.get_gmail_api_client(user)
         gmail_message = gmail_api_client.get_email(gmail_message_id, format="metadata")
-        name, from_address = GoogleApiClient.get_email_from_address(gmail_message)
-        # TODO add logic determining if a message is a newsletter (like checking user's subscriptions in db)
-        if "@substack.com" in from_address.lower():
-            return True
+        if gmail_message:
+            name, from_address = GoogleApiClient.get_email_from_address(gmail_message)
+            # TODO add logic determining if a message is a newsletter (like checking user's subscriptions in db)
+            if "@substack.com" in from_address.lower():
+                return True
         return False
 
     def create_new_article_from_gmail(
@@ -74,9 +75,11 @@ class ContentManager(ManagerFactory):
         gmail_message_id = gmail_message["id"]
         title = GoogleApiClient.get_header_by_name(gmail_message, "Subject")[0]
         author, source = GoogleApiClient.get_email_from_address(gmail_message)
-        html_content = GoogleApiClient.get_email_html_body(gmail_message)
+        html_content = ArticleUtils.transform_html(
+            GoogleApiClient.get_email_html_body(gmail_message), SourceType.SUBSTACK
+        )
         text_content = GoogleApiClient.get_email_text_body(gmail_message)
-        outline = self.generate_outline(html_content)
+        outline = ArticleUtils.generate_outline(html_content)
         ((gmail_message_exists,),) = self.session.query(
             exists().where(
                 and_(
@@ -218,18 +221,3 @@ class ContentManager(ManagerFactory):
             self.session.add(article)
             self.session.flush()
         return article
-
-    def generate_outline(self, html_content: str):
-        outline = ""
-        soup = BeautifulSoup(html_content, "html.parser")
-        for header in soup.find_all(["h1", "h2", "h3"]):
-            if header.name == "h1":
-                outline += f"##### [{header.get_text()}](#)"
-                outline += "  \n\n"
-            elif header.name == "h2":
-                outline += f"[**{header.get_text()}**](#)"
-                outline += "  \n\n"
-            elif header.name == "h3":
-                outline += f"- [**{header.get_text()}**](#)"
-                outline += "  \n\n"
-        return outline

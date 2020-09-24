@@ -11,6 +11,7 @@ from redwood_db.google import GoogleAuthCredential, GoogleAuthState, GoogleHisto
 from redwood_db.user import User
 
 from .factory import ManagerFactory
+from .outcome_codes import OutcomeCodes
 
 logger = logging.getLogger(__name__)
 
@@ -87,7 +88,9 @@ class UserManager(ManagerFactory):
         auth_url, auth_state = google_auth_client.get_google_signup_url()
         return auth_url
 
-    def google_signup_callback(self, callback_url: str) -> Tuple[Optional[User], str]:
+    def google_signup_callback(
+        self, callback_url: str
+    ) -> Tuple[Optional[User], OutcomeCodes]:
         """TODO add whitelist and error codes for different reasons signup failed"""
         google_auth_client: GoogleAuthClient = GoogleAuthClient(self.config)
         (
@@ -98,9 +101,7 @@ class UserManager(ManagerFactory):
         if google_email_address:  # TODO add whitelist here
             try:
                 new_user = self.create_user(google_email_address, first_name, last_name)
-                if new_user:
-                    self.commit_changes()
-                    return new_user
+                return (new_user, OutcomeCodes.SUCCESS)
             except IntegrityError as e:
                 self.session.rollback()
                 if e.orig.pgcode == UNIQUE_VIOLATION:
@@ -108,13 +109,18 @@ class UserManager(ManagerFactory):
                         f"Account already exists for email: {google_email_address}"
                     )
                     return (
-                        self.session.query(User)
-                        .filter_by(email=google_email_address)
-                        .one_or_none()
+                        (
+                            self.session.query(User)
+                            .filter_by(email=google_email_address)
+                            .one_or_none()
+                        ),
+                        OutcomeCodes.ERROR_SIGNUP_USER_ALREADY_EXISTS,
                     )
                 else:
                     raise e
-        return None
+        else:
+            return (None, OutcomeCodes.ERROR_SIGNUP_USER_NOT_WHITELISTED)
+        return (None, OutcomeCodes.ERROR)
 
     def gmail_permissions_step1(self, user: User) -> str:
         """Step 1 when linking Redwood account with google account.
