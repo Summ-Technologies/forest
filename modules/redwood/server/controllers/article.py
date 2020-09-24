@@ -27,20 +27,34 @@ class ArticleController(Resource):
         return responses.success(article.to_json())
 
 
-class BoxArticlesListController(Resource):
-    query_args = {"page": fields.Integer(required=False, missing=0)}
+class ArticlesListController(Resource):
+    query_args = {"articleIds": fields.List(fields.Integer(), required=True)}
 
     @jwt.requires_auth
-    @use_args(query_args, location="query")
-    def get(self, args: dict, id: int):
+    @use_args(query_args, location="querystring")
+    def get(self, args: dict):
+        """Gets article data for given ids
+
+        Args:
+            args ({'articleIds': List[int]}): [description]
+
+        Returns:
+            200, {'articles': [Article.to_json(), ...]}
         """
-        Get articles for box with id.
-        """
-        page = args.get("page", 0)
-        articles = content_manager.get_articles_by_box_id(g.user, id, page)
+        articles = content_manager.get_articles_by_id(g.user, id, args["articleIds"])
         return responses.success(
-            {"articles": list(map(lambda article: article.to_json(), articles))}
+            {"articles": [article.to_json() for article in articles]}
         )
+
+
+class BoxArticlesListController(Resource):
+    @jwt.requires_auth
+    def get(self, id: int):
+        """
+        Get articles ids for box with id.
+        """
+        article_ids = content_manager.get_articles_by_box_id(g.user, id)
+        return responses.success({"article_ids": article_ids})
 
 
 class BookmarkController(Resource):

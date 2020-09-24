@@ -120,7 +120,7 @@ class UserManager(ManagerFactory):
         """Step 1 when linking Redwood account with google account.
 
         Starts the google account linking process by first generating an oauth URL for
-        the user to log in to google with. This function also adds a GoogleAuthState 
+        the user to log in to google with. This function also adds a GoogleAuthState
         record to the connected database. This record is required to complete the
         oauth flow.
 
@@ -148,11 +148,12 @@ class UserManager(ManagerFactory):
                 contains the auth code that can be used to retrieve google credentials
         """
         google_auth_client: GoogleAuthClient = GoogleAuthClient(self.config)
-        google_auth_state: GoogleAuthState = self.session.query(
-            GoogleAuthState
-        ).order_by(GoogleAuthState.created_at.desc()).filter(
-            GoogleAuthState.created_at != None
-        ).first()
+        google_auth_state: GoogleAuthState = (
+            self.session.query(GoogleAuthState)
+            .order_by(GoogleAuthState.created_at.desc())
+            .filter(GoogleAuthState.created_at != None)
+            .first()
+        )
         google_auth_credentials = google_auth_client.validate_gmail_auth(
             callback_url, google_auth_state.state
         )
@@ -178,13 +179,13 @@ class UserManager(ManagerFactory):
 
     def get_gmail_api_client(self, user: User) -> Optional[GoogleApiClient]:
         """Create GoogleApiClient object for given user if they have connected their google account"""
-        credentials_record: GoogleAuthCredential = self.session.query(
-            GoogleAuthCredential
-        ).filter_by(user_id=user.id).order_by(
-            GoogleAuthCredential.created_at.desc()
-        ).filter(
-            GoogleAuthCredential.created_at != None
-        ).first()
+        credentials_record: GoogleAuthCredential = (
+            self.session.query(GoogleAuthCredential)
+            .filter_by(user_id=user.id)
+            .order_by(GoogleAuthCredential.created_at.desc())
+            .filter(GoogleAuthCredential.created_at != None)
+            .first()
+        )
         if credentials_record:
             credentials_json_str = credentials_record.credentials
             return GoogleApiClient.init_api_client(credentials_json_str)

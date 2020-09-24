@@ -41,10 +41,5 @@ def add_routes(api: Api):
     api.add_resource(triage.TriageController, route_v1("/user/triages"))
 
     # /user/articles
+    api.add_resource(article.ArticlesListController, route_v1("/user/articles"))
     api.add_resource(article.ArticleController, route_v1("/user/articles/<int:id>"))
-    api.add_resource(
-        article.BookmarkController, route_v1("/user/articles/<int:id>/bookmark")
-    )
-
-    # /user/google/email
-    api.add_resource(user.UserGoogleAccountController, route_v1("/user/google/email"))

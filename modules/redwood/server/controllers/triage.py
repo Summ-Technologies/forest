@@ -36,10 +36,12 @@ class TriageController(Resource):
     @use_args(post_args, location="json")
     def post(self, args):
         """
-        Move an article into a new box.
+        Move an article into a new box, return the list of article ids for the target box.
         """
         new_triage = triage_manager.triage_article(
             g.user, args.get("article_id"), args.get("box_id")
         )
+        article_ids = content_manager.get_articles_by_box_id(g.user, args["box_id"])
+        ret = {"article_ids": article_ids}
         triage_manager.commit_changes()
-        return responses.success(None)
+        return responses.success(ret)
