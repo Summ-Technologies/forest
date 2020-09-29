@@ -42,4 +42,5 @@ def add_routes(api: Api):
 
     # /user/articles
     api.add_resource(article.ArticlesListController, route_v1("/user/articles"))
+    api.add_resource(article.ArticleSearchController, route_v1("/user/articles/search"))
     api.add_resource(article.ArticleController, route_v1("/user/articles/<int:id>"))

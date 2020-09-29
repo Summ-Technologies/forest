@@ -206,6 +206,25 @@ class ContentManager(ManagerFactory):
         ).all()
         return [article_id for (article_id,) in article_ids]
 
+    def get_articles_by_search_query(self, user: User, box_id: int, query: str):
+        user_articles = self.session.query(Article.id).filter_by(user_id=user.id)
+        article_ids = (
+            self.session.query(Triage.article_id)
+            .filter(Triage.article_id.in_(user_articles))
+            .filter_by(box_id=box_id)
+            .filter_by(is_active=True)
+        )
+
+        matching_article_ids = (
+            self.session.query(Article.id)
+            .filter(Article.id.in_(article_ids))
+            .filter(
+                Article.title.ilike(f"%{query.lower()}%"),
+                Article.text_content.ilike(f"%{query.lower()}%"),
+            )
+        ).all()
+        return [article_id for (article_id,) in matching_article_ids]
+
     def bookmark_article(self, article: Article) -> Article:
         """Add bookmarked to article"""
         if not article.bookmarked:

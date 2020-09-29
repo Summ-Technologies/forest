@@ -57,6 +57,26 @@ class BoxArticlesListController(Resource):
         return responses.success({"article_ids": article_ids})
 
 
+class ArticleSearchController(Resource):
+    query_args = {"query": fields.String(required=True, data_key="q")}
+
+    @jwt.requires_auth
+    @use_args(query_args, location="querystring")
+    def get(self, args: dict):
+        """
+        Gets article ids matching search query, sorted by box id of that article.
+        """
+        ret = {}
+        user_boxes = triage_manager.get_boxes_for_user(g.user)
+        for box in user_boxes:
+            article_ids = content_manager.get_articles_by_search_query(
+                g.user, box.id, args["query"].lower()
+            )
+            ret.update({box.id: article_ids})
+
+        return responses.success(ret)
+
+
 class BookmarkController(Resource):
     @jwt.requires_auth
     def post(self, id):
