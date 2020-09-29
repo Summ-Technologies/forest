@@ -66,14 +66,15 @@ class ArticleSearchController(Resource):
         """
         Gets article ids matching search query, sorted by box id of that article.
         """
-        ret = {}
+        matches = {}
         user_boxes = triage_manager.get_boxes_for_user(g.user)
         for box in user_boxes:
             article_ids = content_manager.get_articles_by_search_query(
                 g.user, box.id, args["query"].lower()
             )
-            ret.update({box.id: article_ids})
+            matches.update({box.id: article_ids})
 
+        ret = {"query": args["query"], "matches": matches}
         return responses.success(ret)
 
 
