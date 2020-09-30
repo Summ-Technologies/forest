@@ -243,6 +243,23 @@ class GoogleApiClient:
         return None
 
     @staticmethod
+    def get_email_received_datetime(gmail_message: dict) -> Optional[datetime]:
+        received_strs = GoogleApiClient.get_header_by_name(gmail_message, "Received")
+        for received_str in received_strs:
+            received_split = received_str.split(";")
+            if len(received_split) > 1:
+                _, date_str, *rest = received_split
+                try:
+                    dt = email.utils.parsedate_to_datetime(date_str)
+                    if dt:
+                        return dt
+                except TypeError as e:
+                    logger.warning(
+                        f"Received header: {received_str}, gmail_message_id: {gmail_message.get('id')}, failed to be parsed to datetime"
+                    )
+        return None
+
+    @staticmethod
     def get_header_by_name(gmail_message: str, header_name: str) -> List[str]:
         """Get the value(s) of the header
 

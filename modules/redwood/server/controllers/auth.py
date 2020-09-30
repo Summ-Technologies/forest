@@ -42,6 +42,7 @@ class GoogleSignupCallbackController(Resource):
             args["callback_url"]
         )
         if new_user:
+            user_manager.commit_changes()
             cookie_name = jwt.jwt_cookie_name
             jwt_token = jwt.encode_jwt(new_user.login_id)
             headers = {"Set-Cookie": f"{cookie_name}={jwt_token}; Path=/; HttpOnly"}

@@ -1,14 +1,16 @@
 import logging
+from datetime import datetime, timezone
 from typing import List, Optional
 
 from sqlalchemy import and_, exists
 
 from autotroph_core.google_api import GoogleApiClient
-from redwood_db.content import Article
+from redwood_db.content import Article, Subscription
 from redwood_db.triage import Box, Triage
-from redwood_db.user import User
+from redwood_db.user import User, UserSubscription
 
-from .article import ArticleUtils, SourceType
+from .article import TransformerFactory
+from .article import source as source_utils
 from .factory import ManagerFactory
 from .user_manager import UserManager
 
@@ -53,13 +55,30 @@ class ContentManager(ManagerFactory):
         gmail_message = gmail_api_client.get_email(gmail_message_id, format="metadata")
         if gmail_message:
             name, from_address = GoogleApiClient.get_email_from_address(gmail_message)
-            # TODO add logic determining if a message is a newsletter (like checking user's subscriptions in db)
-            if "@substack.com" in from_address.lower():
-                return True
+            for subscription in source_utils.general_newsletter_subscriptions:
+                if source_utils.is_newsletter_subscription(
+                    from_address.lower() if from_address else from_address,
+                    name.lower() if name else name,
+                    subscription,
+                ):
+                    logger.info(
+                        f"GmailMessage from name: {name}, address: {from_address} is a generic subscription matching: {subscription}"
+                    )
+                    return True
+            for subscription in self.get_subscriptions_by_user(user):
+                if source_utils.is_newsletter_subscription(
+                    from_address.lower() if from_address else from_address,
+                    name.lower() if name else name,
+                    subscription,
+                ):
+                    logger.info(
+                        f"GmailMessage from name: {name}, address: {from_address} is a personal subscription matching: {subscription}"
+                    )
+                    return True
         return False
 
     def create_new_article_from_gmail(
-        self, user: User, gmail_message: dict, move_to_library: bool = False
+        self, user: User, gmail_message: dict
     ) -> Optional[Article]:
         """Retrieves email from gmail and saves data as new article record.
 
@@ -71,15 +90,19 @@ class ContentManager(ManagerFactory):
         Returns:
             (Article): newly added and flushed article record
         """
+        tranformer_factory = TransformerFactory(self.config)
         user_manager = self.get_manager("user")
         gmail_message_id = gmail_message["id"]
         title = GoogleApiClient.get_header_by_name(gmail_message, "Subject")[0]
-        author, source = GoogleApiClient.get_email_from_address(gmail_message)
-        html_content = ArticleUtils.transform_html(
-            GoogleApiClient.get_email_html_body(gmail_message), SourceType.SUBSTACK
+        from_name, from_address = GoogleApiClient.get_email_from_address(gmail_message)
+        source_type = source_utils.source_to_source_type(from_address)
+        transformer = tranformer_factory.get_transformer(source_type)
+        received_dt = GoogleApiClient.get_email_received_datetime(gmail_message)
+        received_dt = received_dt if received_dt else datetime.now(tz=timezone.utc)
+        html_content, outline = transformer.get_html_and_outline(
+            GoogleApiClient.get_email_html_body(gmail_message)
         )
-        text_content = GoogleApiClient.get_email_text_body(gmail_message)
-        outline = ArticleUtils.generate_outline(html_content)
+        text_content = transformer.get_text(html_content)
         ((gmail_message_exists,),) = self.session.query(
             exists().where(
                 and_(
@@ -96,19 +119,17 @@ class ContentManager(ManagerFactory):
             new_article = self.create_new_article(
                 user,
                 title,
-                source,
-                author=author,
+                from_address,
+                author=from_name,
                 outline=outline,
                 text_content=text_content,
                 html_content=html_content,
                 gmail_message_id=gmail_message_id,
+                received_at=received_dt,
             )
             if new_article:
                 triage_manager = self.get_manager("triage")
-                if move_to_library:
-                    box = triage_manager.get_user_library(user)
-                else:
-                    box = triage_manager.get_user_inbox(user)
+                box = triage_manager.get_user_inbox(user)
                 triage_manager.create_new_triage(new_article, box)
                 return new_article
 
@@ -122,6 +143,7 @@ class ContentManager(ManagerFactory):
         text_content: str,
         html_content: str,
         gmail_message_id: str,
+        received_at: datetime,
     ) -> Article:
         """Creates a new article.
         Adds, and flushes, but does not commit the article record.
@@ -144,6 +166,7 @@ class ContentManager(ManagerFactory):
         article.html_content = html_content
         article.gmail_message_id = gmail_message_id
         article.user_id = user.id
+        article.message_received_at = received_at
         self.session.add(article)
         self.session.flush()
         return article
@@ -224,6 +247,18 @@ class ContentManager(ManagerFactory):
             )
         ).all()
         return [article_id for (article_id,) in matching_article_ids]
+
+    def get_subscriptions_by_user(self, user: User):
+        subscription_ids = (
+            self.session.query(UserSubscription.subscription_id)
+            .filter_by(user_id=user.id, is_active=True)
+            .all()
+        )
+        return (
+            self.session.query(Subscription)
+            .filter(Subscription.id.in_(subscription_ids))
+            .all()
+        )
 
     def bookmark_article(self, article: Article) -> Article:
         """Add bookmarked to article"""

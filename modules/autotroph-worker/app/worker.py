@@ -15,8 +15,6 @@ def import_gmail_newsletters(
     channel, method_frame, header_frame, message: ConnectedGoogleAccountMessage
 ):
     logger.info(f"Starting gmail newsletter import for {message.serialize()}")
-    # Acking message
-    channel.basic_ack(delivery_tag=method_frame.delivery_tag)
 
     # Object setup
     session = db.setup_db_session(config["SQLALCHEMY_DATABASE_URI"])
@@ -40,13 +38,16 @@ def import_gmail_newsletters(
                 logger.info(
                     f"{user} gmail message id: {gmail_message_id} will be imported as whittle email."
                 )
-                if "UNREAD" in gmail_message.get("labelIds"):
-                    move_to_library = False
-                else:
-                    move_to_library = True
                 new_article = content_manager.create_new_article_from_gmail(
-                    user, gmail_message, move_to_library
+                    user, gmail_message
                 )
+                if new_article:
+                    if "UNREAD" not in gmail_message.get("labelIds"):
+                        box = triage_manager.get_user_library(user)
+                        triage_manager.create_new_triage(new_article, box)
                 content_manager.commit_changes()
     logger.info(f"Completed gmail newsletter import for {message.serialize()}")
+    # Acking message
+    channel.basic_ack(delivery_tag=method_frame.delivery_tag)
+    logger.info(f"Acking message {message.serialize()}")
     session.close()
