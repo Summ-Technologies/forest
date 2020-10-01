@@ -7,8 +7,9 @@ from sqlalchemy.exc import IntegrityError
 
 from autotroph_core.google_api import GoogleApiClient
 from autotroph_core.google_auth import GoogleAuthClient
+from redwood_db.content import Subscription
 from redwood_db.google import GoogleAuthCredential, GoogleAuthState, GoogleHistoryId
-from redwood_db.user import User
+from redwood_db.user import User, UserSubscription
 
 from .factory import ManagerFactory
 from .outcome_codes import OutcomeCodes
@@ -46,6 +47,23 @@ class UserManager(ManagerFactory):
         triage_manager.create_box_for_user(new_user, "Queue")
         triage_manager.create_box_for_user(new_user, "Library")
         return new_user
+
+    def add_user_subscription(
+        self, user: User, subscription: Subscription
+    ) -> Optional[UserSubscription]:
+        if (
+            self.session.query(UserSubscription)
+            .filter_by(user_id=user.id, subscription_id=subscription.id, is_active=True)
+            .first()
+            is None
+        ):
+            user_subscription = UserSubscription()
+            user_subscription.user_id = user.id
+            user_subscription.subscription_id = subscription.id
+            user_subscription.is_active = True
+            self.session.add(user_subscription)
+            self.session.flush()
+            return user_subscription
 
     def get_latest_history_id(self, user: User) -> Optional[str]:
         history_id_record = (

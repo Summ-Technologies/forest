@@ -32,20 +32,26 @@ def import_gmail_newsletters(
     messages = content_manager.get_new_emails(user)
     # check if should add messages
     for gmail_message_id in messages:
-        if content_manager.is_email_newsletter(user, gmail_message_id):
-            gmail_message = gmail_api_client.get_email(gmail_message_id)
-            if gmail_message:
-                logger.info(
-                    f"{user} gmail message id: {gmail_message_id} will be imported as whittle email."
-                )
-                new_article = content_manager.create_new_article_from_gmail(
-                    user, gmail_message
-                )
-                if new_article:
-                    if "UNREAD" not in gmail_message.get("labelIds"):
-                        box = triage_manager.get_user_library(user)
-                        triage_manager.create_new_triage(new_article, box)
-                content_manager.commit_changes()
+        try:
+            if content_manager.is_email_newsletter(user, gmail_message_id):
+                gmail_message = gmail_api_client.get_email(gmail_message_id)
+                if gmail_message:
+                    logger.info(
+                        f"{user} gmail message id: {gmail_message_id} will be imported as whittle email."
+                    )
+                    new_article = content_manager.create_new_article_from_gmail(
+                        user, gmail_message
+                    )
+                    if new_article:
+                        if "UNREAD" not in gmail_message.get("labelIds"):
+                            box = triage_manager.get_user_library(user)
+                            triage_manager.create_new_triage(new_article, box)
+                    content_manager.commit_changes()
+        except Exception as e:
+            logger.error(
+                f"Failed importing gmail_message_id={gmail_message_id} for {message.serialize()}",
+                exc_info=e,
+            )
     logger.info(f"Completed gmail newsletter import for {message.serialize()}")
     # Acking message
     channel.basic_ack(delivery_tag=method_frame.delivery_tag)

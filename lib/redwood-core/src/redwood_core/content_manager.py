@@ -99,9 +99,12 @@ class ContentManager(ManagerFactory):
         transformer = tranformer_factory.get_transformer(source_type)
         received_dt = GoogleApiClient.get_email_received_datetime(gmail_message)
         received_dt = received_dt if received_dt else datetime.now(tz=timezone.utc)
-        html_content, outline = transformer.get_html_and_outline(
-            GoogleApiClient.get_email_html_body(gmail_message)
-        )
+        html_body = GoogleApiClient.get_email_html_body(gmail_message)
+        if not html_body:
+            logger.error(
+                f"Can't create article from gmail_message: {gmail_message} because not html body"
+            )
+        html_content, outline = transformer.get_html_and_outline(html_body)
         text_content = transformer.get_text(html_content)
         ((gmail_message_exists,),) = self.session.query(
             exists().where(
@@ -259,6 +262,29 @@ class ContentManager(ManagerFactory):
             .filter(Subscription.id.in_(subscription_ids))
             .all()
         )
+
+    def get_subscription_by_from_address(
+        self, from_address: str
+    ) -> Optional[Subscription]:
+        """Returns Subscription record for exact match of from_address and any from name"""
+        from_address = f"^{from_address}$"  # create exact match record
+        from_name = ".*"  # any from name
+        return (
+            self.session.query(Subscription)
+            .filter_by(from_address=from_address, name=from_name)
+            .first()
+        )
+
+    def create_subscription(self, from_address: str):
+        """Creates a Subscription record for exact match of from_address"""
+        from_address = f"^{from_address}$"  # create exact match record
+        from_name = ".*"  # any from name
+        new_subscription = Subscription()
+        new_subscription.from_address = from_address
+        new_subscription.name = from_name
+        self.session.add(new_subscription)
+        self.session.flush()
+        return new_subscription
 
     def bookmark_article(self, article: Article) -> Article:
         """Add bookmarked to article"""
