@@ -13,7 +13,10 @@ logger = logging.getLogger(__name__)
 class GoogleAuthClient:
 
     ## Defaults
-    DEFAULT_GMAIL_SCOPE = ["https://www.googleapis.com/auth/gmail.readonly"]
+    DEFAULT_GMAIL_SCOPE = [
+        "https://www.googleapis.com/auth/gmail.readonly",
+        "https://www.googleapis.com/auth/gmail.modify",
+    ]
 
     LOGIN_SCOPE = [
         "openid",
