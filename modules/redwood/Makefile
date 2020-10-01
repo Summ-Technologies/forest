@@ -1,5 +1,5 @@
 # latest = 0.2.1
-version=0.2.1
+version=latest
 docker-user=jaredhanson11
 name=${docker-user}/redwood
 
