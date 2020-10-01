@@ -223,13 +223,33 @@ class ContentManager(ManagerFactory):
             List[Article]: list of article resources
         """
         user_articles = self.session.query(Article.id).filter_by(user_id=user.id)
-        article_ids = (
+        triage_manager = self.get_manager("triage")
+        box = triage_manager.get_box_by_id(box_id)
+        if not box:
+            return []
+
+        base_query = (
             self.session.query(Triage.article_id)
             .filter(Triage.article_id.in_(user_articles))
             .filter_by(box_id=box_id)
             .filter_by(is_active=True)
-            .order_by(Triage.created_at.asc())
-        ).all()
+        )
+
+        ## TODO change this to an actual value on the box record itself
+        if box.name and box.name.lower() == "inbox":
+            ## Received at time
+            article_ids = (
+                self.session.query(Article.id)
+                .filter(Article.id.in_(base_query))
+                .order_by(Article.message_received_at.desc())
+                .all()
+            )
+        elif box.name and box.name.lower() == "queue":
+            ## FIFO
+            article_ids = base_query.order_by(Triage.created_at.asc()).all()
+        else:  # basically == elif box.name and box.name.lower() == "library":
+            ## LIFO
+            article_ids = base_query.order_by(Triage.created_at.desc()).all()
         return [article_id for (article_id,) in article_ids]
 
     def get_articles_by_search_query(self, user: User, box_id: int, query: str):
