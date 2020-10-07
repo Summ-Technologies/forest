@@ -140,6 +140,26 @@ class GoogleApiClient:
                 return None
         return gmail_message
 
+    def archive_email(self, gmail_message_id: str) -> Optional[dict]:
+        INBOX_LABEL = "INBOX"
+        MODIFY_REQUEST_BODY = {"removeLabelIds": [INBOX_LABEL]}
+        gmail_service = self.get_gmail_service()
+        try:
+            archived_message = (
+                gmail_service.users()
+                .messages()
+                .modify(userId="me", id=gmail_message_id, body=MODIFY_REQUEST_BODY)
+                .execute()
+            )
+        except HttpError as e:
+            if e.resp.status == 404:
+                return None
+            else:
+                logger.error(f"Error getting email with exception", exc_info=HttpError)
+                return None
+        except Exception as e:
+            pass
+
     def get_user_profile(self) -> dict:
         """Get gmail user profile for the user with credentials associated to this object
 
