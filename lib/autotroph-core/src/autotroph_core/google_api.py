@@ -88,7 +88,7 @@ class GoogleApiClient:
                     _new_email_ids,
                     next_page_token,
                     current_history_id,
-                ) = self._list_history(history_id, None)
+                ) = self._list_history(history_id, next_page_token)
                 new_email_ids.extend(_new_email_ids)
                 if is_first:
                     is_first = False
