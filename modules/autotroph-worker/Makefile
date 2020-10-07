@@ -1,5 +1,5 @@
-# latest = 0.2.1
-version=latest
+# latest = 0.2.2
+version=0.2.2
 docker-user=jaredhanson11
 name=${docker-user}/autotroph-worker
 
