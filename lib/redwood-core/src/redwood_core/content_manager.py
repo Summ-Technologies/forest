@@ -114,9 +114,35 @@ class ContentManager(ManagerFactory):
                 )
             )
         )
+        # TODO this logic should be in the is_email_newsletter function, not here
+        # Should the message be excluded because of the subject line
+        #   For example: substack publishers get emails from the same from_name/from_address as their
+        #   actual newsletter, when someone simply subscribes. This will exclude creating an article
+        #   for substack addresses with "New signup" in the subjectline
+        def do_exclude_by_subjectline(
+            from_name: str, from_address: str, title: str
+        ) -> bool:
+            from_address = "" if from_address is None else from_address.lower()
+            from_name = "" if from_name is None else from_name.lower()
+            title = "" if title is None else title.lower()
+            if "substack" in from_address:
+                if "new" in title and "signup" in title:
+                    return True
+                elif "complete your signup" in title:
+                    return True
+            return False
+
+        exclude_by_subjectline = do_exclude_by_subjectline(
+            from_name, from_address, title
+        )
+
         if gmail_message_exists:
             logger.warning(
                 f"{user} attempting to create article from email with id: {gmail_message_id} but this id exists in the articles table already."
+            )
+        elif exclude_by_subjectline:
+            logger.info(
+                f"{user} attempting to create article, but was excluded due to subjectline. from_name: {from_name}, from_address: {from_address}, subject: {title}"
             )
         else:
             new_article = self.create_new_article(
