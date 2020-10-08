@@ -75,13 +75,13 @@ class AbstractTransformer(ABC):
         return soup.get_text(" ", strip=True)
 
     def _create_outline_h1(self, text: str, anchor_id: str):
-        return f"##### [{text}](#{anchor_id})  \n\n"
+        return f"##### [{text.strip()}](#{anchor_id})  \n\n"
 
     def _create_outline_h2(self, text: str, anchor_id: str):
-        return f"[**{text}**](#{anchor_id})  \n\n"
+        return f"[**{text.strip()}**](#{anchor_id})  \n\n"
 
     def _create_outline_h3(self, text: str, anchor_id: str):
-        return f"- [**{text}**](#{anchor_id})  \n\n"
+        return f"- [**{text.strip()}**](#{anchor_id})  \n\n"
 
     def _anchor_id(self, name: str):
         html_id_prefix = "whittle_anchor_"
