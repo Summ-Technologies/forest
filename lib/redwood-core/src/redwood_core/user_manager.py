@@ -9,7 +9,7 @@ from autotroph_core.google_api import GoogleApiClient
 from autotroph_core.google_auth import GoogleAuthClient
 from redwood_db.content import Subscription
 from redwood_db.google import GoogleAuthCredential, GoogleAuthState, GoogleHistoryId
-from redwood_db.user import User, UserSubscription
+from redwood_db.user import User, UserConfig, UserSubscription
 
 from .factory import ManagerFactory
 from .outcome_codes import OutcomeCodes
@@ -218,6 +218,25 @@ class UserManager(ManagerFactory):
                 f"{user} has not connected Google account so cannot initialize a GoogleApiClient instance."
             )
             return
+
+    def get_user_config(self, user: User) -> Tuple[UserConfig, bool]:
+        """Get's user's config object (and creates one if it doesn't exist)
+        Returns:
+            [user_config: UserConfig, new_config: bool] where new_config
+                is true when the object returned was newly created
+        """
+        new_config = False
+        config = self.session.query(UserConfig).filter_by(user_id=user.id).one_or_none()
+        if not config:
+            logger.debug(
+                f"Config record doesn't exist for {user}. Creating default config..."
+            )
+            new_config = True
+            config = UserConfig()
+            config.user_id = user.id
+            self.session.add(config)
+            self.session.flush()
+        return (config, new_config)
 
     def _encrypt_pw(self, password: str) -> str:
         """Generate salted password hash"""

@@ -141,8 +141,10 @@ class GoogleApiClient:
         return gmail_message
 
     def archive_email(self, gmail_message_id: str) -> Optional[dict]:
+        """Archive (and mark as read) the given gmail message"""
         INBOX_LABEL = "INBOX"
-        MODIFY_REQUEST_BODY = {"removeLabelIds": [INBOX_LABEL]}
+        UNREAD_LABEL = "UNREAD"
+        MODIFY_REQUEST_BODY = {"removeLabelIds": [INBOX_LABEL, UNREAD_LABEL]}
         gmail_service = self.get_gmail_service()
         try:
             archived_message = (

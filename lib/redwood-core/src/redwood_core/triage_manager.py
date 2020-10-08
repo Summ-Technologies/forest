@@ -61,6 +61,8 @@ class TriageManager(ManagerFactory):
 
     def triage_article(self, user: User, article_id: int, box_id: int):
         content_manager: ContentManager = self.get_manager("content")
+        user_manager = self.get_manager("user")
+        (user_config, _) = user_manager.get_user_config(user)
         article = content_manager.get_article_by_id(article_id, user)
         box = self.get_box_by_id(box_id)
         if (article) and (box and box.user_id == user.id):
@@ -69,6 +71,23 @@ class TriageManager(ManagerFactory):
             if not current_box or current_box.id != box.id:
                 # mark previous triages as inactive
                 triage = self.create_new_triage(article, box)
+                library = self.get_user_library(user)
+                if box == library and user_config.gmail_auto_archive:
+                    logger.info(
+                        f"Triaging {article} to {box}. {user_config} has auto archive enabled. Attempting to archive message in gmail"
+                    )
+                    try:
+                        gmail_api_client = user_manager.get_gmail_api_client(user)
+                        gmail_api_client.archive_email(article.gmail_message_id)
+                    except Exception as e:
+                        logger.error(
+                            f"Error when trying to archive {article}", exc_info=e
+                        )
+                elif box == library:
+                    logger.info(
+                        f"Triaging {article} to {box} but auto archive is disabled"
+                    )
+
             else:
                 logger.info(
                     f"{user} tried to triage {article} to {box} but it already existed in that box."
