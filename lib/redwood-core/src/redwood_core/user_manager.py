@@ -238,6 +238,14 @@ class UserManager(ManagerFactory):
             self.session.flush()
         return (config, new_config)
 
+    def set_auto_archive_config(self, user: User, do_auto_archive: bool) -> UserConfig:
+        """Sets the auto archive config option for the given user's config"""
+        (user_config, _) = self.get_user_config(user)
+        user_config.gmail_auto_archive = do_auto_archive
+        self.session.add(user_config)
+        self.session.flush()
+        return user_config
+
     def _encrypt_pw(self, password: str) -> str:
         """Generate salted password hash"""
         hashed = bcrypt.hashpw(str(password).encode("utf-8"), self.PW_SALT)

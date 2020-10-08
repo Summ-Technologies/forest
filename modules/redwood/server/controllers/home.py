@@ -37,10 +37,15 @@ class UserHomeController(Resource):
             box.id: content_manager.get_num_articles_by_box_id(g.user, box.id)
             for box in boxes
         }
+
+        user_config, new_config = user_manager.get_user_config(g.user)
+        if new_config:
+            user_manager.commit_changes()
         ## JSON
         ret = {
             "user": g.user.to_json(),
             "boxes": list(map(lambda box: box.to_json(), boxes)),
             "boxes_articles_count": boxes_count,
+            "user_config": user_config.to_json(),
         }
         return responses.success(ret)

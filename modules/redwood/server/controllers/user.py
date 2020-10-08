@@ -37,6 +37,21 @@ class UserController(Resource):
         return responses.success({"user": g.user.to_json()})
 
 
+class UserConfigAutoArchiveController(Resource):
+    put_body = {"auto_archive": fields.Boolean(dataKey="autoArchive", required=True)}
+
+    @jwt.requires_auth
+    @use_args(put_body, location="json")
+    def put(self, put_args):
+        """Update user config option for gmail_auto_archive"""
+        do_auto_archive = put_args["auto_archive"]
+        user_config = user_manager.set_auto_archive_config(g.user, do_auto_archive)
+        user_manager.commit_changes()
+        if user_config:
+            return responses.success(user_config.to_json())
+        return responses.error("Something went wrong")
+
+
 class UserSubscriptionController(Resource):
     post_args = {"from_address": fields.Email(data_key="fromAddress", required=True)}
 

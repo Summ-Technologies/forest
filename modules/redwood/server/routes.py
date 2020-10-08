@@ -47,3 +47,8 @@ def add_routes(api: Api):
 
     # /user/subscriptions
     api.add_resource(user.UserSubscriptionController, route_v1("/user/subscriptions"))
+
+    # /user/config
+    api.add_resource(
+        user.UserConfigAutoArchiveController, route_v1("/user/config/auto-archive")
+    )
