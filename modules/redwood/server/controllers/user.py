@@ -38,7 +38,7 @@ class UserController(Resource):
 
 
 class UserConfigAutoArchiveController(Resource):
-    put_body = {"auto_archive": fields.Boolean(dataKey="autoArchive", required=True)}
+    put_body = {"auto_archive": fields.Boolean(data_key="autoArchive", required=True)}
 
     @jwt.requires_auth
     @use_args(put_body, location="json")
